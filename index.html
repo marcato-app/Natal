@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#0b1533">
+<title>Vila de Natal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap">
+<link rel="stylesheet" href="/assets/css/jogo.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-moedas" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#ffc94d" stroke="#d48a12" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="#d48a12" stroke-width="1.6"/></symbol>
+  <symbol id="i-doces" viewBox="0 0 24 24"><path d="M2 7l5 3v4l-5 3z M22 7l-5 3v4l5 3z" fill="#ff8c90"/><circle cx="12" cy="12" r="6" fill="#e5484d"/><path d="M9 10.5c2-2 5-1 5 1.5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="i-alegria" viewBox="0 0 24 24"><path d="M12 20.5s-8-4.8-8-10.5a4.5 4.5 0 0 1 8-2.8 4.5 4.5 0 0 1 8 2.8c0 5.7-8 10.5-8 10.5z" fill="#ff8fb1" stroke="#e0567f" stroke-width="1.6"/></symbol>
+  <symbol id="i-elfo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><path d="M6 19C8 13 10 8 13 4c2 3 4 5 6 6"/><circle cx="19.5" cy="10.5" r="1.6"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+  <symbol id="i-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></symbol>
+  <symbol id="i-girar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-2.3-5.6"/><path d="M20 4v5h-5"/></symbol>
+  <symbol id="i-mover" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18M3 12h18M12 3L9 6M12 3l3 3M12 21l-3-3M12 21l3-3M3 12l3-3M3 12l3 3M21 12l-3-3M21 12l-3 3"/></symbol>
+  <symbol id="i-martelo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4l6 6-3 3-6-6z"/><path d="M12.5 8.5L3.5 17.5l3 3 9-9"/></symbol>
+  <symbol id="i-amigos" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5"/><path d="M16 5.5a2.6 2.6 0 0 1 0 5"/><path d="M17 14.6c2.4.4 4 2.4 4 5.4"/></symbol>
+  <symbol id="i-cadeado" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></symbol>
+  <symbol id="i-sono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10h6l-6 7h6M14 4h6l-6 7h6"/></symbol>
+</svg>
+
+<canvas id="cena" aria-label="Sua vila de Natal em 3D. Toque num prédio para ver detalhes."></canvas>
+<div id="baloes"></div>
+
+<div id="ui">
+  <header class="hud">
+    <div class="lvl glass">
+      <div class="badge" id="nivel">1</div>
+      <div>
+        <div class="vname">Minha Vila</div>
+        <div class="xp"><i id="xp-barra" style="width:0%"></i></div>
+        <div class="xpt" id="xp-texto">0 / 30 alegria</div>
+      </div>
+    </div>
+    <div class="res">
+      <div class="pill glass" title="Moedas"><svg aria-hidden="true"><use href="#i-moedas"/></svg><span id="r-moedas">0</span></div>
+      <div class="pill glass" title="Doces"><svg aria-hidden="true"><use href="#i-doces"/></svg><span id="r-doces">0</span></div>
+      <div class="pill glass" title="Alegria"><svg aria-hidden="true"><use href="#i-alegria"/></svg><span id="r-alegria">0</span></div>
+    </div>
+  </header>
+
+  <div class="spacer"></div>
+
+  <!-- barra principal -->
+  <nav class="nav" id="nav" aria-label="Ações">
+    <button type="button" class="primary" data-abrir="construir"><span class="ic"><svg aria-hidden="true"><use href="#i-martelo"/></svg></span>Construir</button>
+    <button type="button" data-abrir="duendes"><span class="ic glass"><svg aria-hidden="true"><use href="#i-elfo"/></svg></span><span id="nav-duendes">Duendes</span></button>
+    <button type="button" data-abrir="amigos"><span class="ic glass"><svg aria-hidden="true"><use href="#i-amigos"/></svg></span>Amigos</button>
+  </nav>
+
+  <!-- posicionando um prédio -->
+  <section class="place glass" id="place" hidden aria-label="Posicionar prédio">
+    <div class="place-txt"><b id="place-nome">Padaria</b><span>Toque ou arraste no chão pra escolher o lugar</span></div>
+    <div class="place-btns">
+      <button type="button" class="round" id="place-girar" aria-label="Girar"><svg aria-hidden="true"><use href="#i-girar"/></svg></button>
+      <button type="button" class="round bad" id="place-cancelar" aria-label="Cancelar"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+      <button type="button" class="round good" id="place-ok" aria-label="Confirmar"><svg aria-hidden="true"><use href="#i-ok"/></svg></button>
+    </div>
+  </section>
+
+  <!-- menu construir -->
+  <section class="sheet glass" id="sheet-construir" hidden aria-label="Construir">
+    <div class="sheet-head"><h2>Construir</h2><button type="button" class="round" data-fechar aria-label="Fechar"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
+    <div class="tabs" id="tabs"></div>
+    <div class="cards" id="cards"></div>
+  </section>
+
+  <!-- painel do prédio -->
+  <section class="sheet glass" id="sheet-predio" hidden aria-label="Prédio">
+    <div class="sheet-head">
+      <div class="ph-title"><img id="pd-thumb" alt=""><div><h2 id="pd-nome">Prédio</h2><div class="sub" id="pd-sub"></div></div></div>
+      <button type="button" class="round" data-fechar aria-label="Fechar"><svg aria-hidden="true"><use href="#i-x"/></svg></button>
+    </div>
+    <div id="pd-corpo"></div>
+    <div class="acts" id="pd-acoes"></div>
+  </section>
+
+  <!-- duendes -->
+  <section class="sheet glass" id="sheet-duendes" hidden aria-label="Duendes">
+    <div class="sheet-head"><h2>Duendes</h2><button type="button" class="round" data-fechar aria-label="Fechar"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
+    <p class="info" id="dd-info"></p>
+    <ul class="elf-list" id="dd-lista"></ul>
+    <button type="button" class="cta" id="dd-contratar">Contratar duende</button>
+  </section>
+
+  <!-- amigos (próxima etapa) -->
+  <section class="sheet glass" id="sheet-amigos" hidden aria-label="Amigos">
+    <div class="sheet-head"><h2>Amigos</h2><button type="button" class="round" data-fechar aria-label="Fechar"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
+    <p class="info">Em breve: lista de amigos, visitar a vila deles, mandar presentes e ajudar a acelerar a produção.</p>
+  </section>
+</div>
+
+<div class="toast glass" id="toast" role="status" aria-live="polite"></div>
+<div class="carregando" id="carregando"><div class="badge">★</div><p>Acendendo as luzinhas…</p></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module" src="/assets/js/jogo.js"></script>
+</body>
+</html>
