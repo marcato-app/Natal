@@ -1,0 +1,11 @@
+{
+  "appId": "app.marcato.natal",
+  "appName": "Vila de Natal",
+  "webDir": "www",
+  "backgroundColor": "#0b1533",
+  "ios": { "contentInset": "never", "backgroundColor": "#0b1533" },
+  "android": { "backgroundColor": "#0b1533" },
+  "plugins": {
+    "SplashScreen": { "launchShowDuration": 1200, "backgroundColor": "#0b1533", "showSpinner": false, "launchFadeOutDuration": 400 }
+  }
+}

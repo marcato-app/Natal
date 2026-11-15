@@ -95,10 +95,33 @@ salva no `localStorage` e manda a fila quando o servidor voltar.
 Autenticação: `Authorization: Bearer <token>`. O token fica no `localStorage`
 (`natal.token`). Contas de verdade vêm depois, reaproveitando a tabela `jogadores`.
 
+## App (Android e iOS)
+
+O mesmo jogo vira app com **Capacitor 8** (`capacitor.config.json`, `appId`
+`app.marcato.natal`: trocar antes da primeira publicação, depois não muda mais). Tudo
+fica dentro do app (Three.js, fontes, som sintetizado), então joga offline; amigos e
+anúncios precisam de internet.
+
+- `npm run app:web` monta `www/` (o que vai dentro do app). `npm run app:sync` copia
+  pros projetos nativos `android/` e `ios/` (versionados no repo).
+- No app a página roda em `capacitor://localhost` (iOS) / `https://localhost`
+  (Android) e chama a API publicada (`API` em `jogo.js`); o Worker libera CORS só pra
+  essas origens. Token e vila também vão pro Preferences nativo (o iPhone pode limpar o
+  localStorage de app; o Preferences não). Vibração ao coletar (Haptics).
+- Ícones e telas de abertura: `resources/` (desenhados de `assets/icones/icone.svg`) →
+  `python3 scripts/icones-app.py` espalha pelos tamanhos de Android e iOS.
+- **Android**: o GitHub Actions (`.github/workflows/android.yml`) gera o APK de teste a
+  cada push (Actions → execução → Artifacts). Pra loja: assinar com keystore própria
+  (`./gradlew bundleRelease`).
+- **iOS**: precisa de Mac com Xcode (`npm run app:ios`) ou build na nuvem (Codemagic,
+  Xcode Cloud). Conta Apple Developer (US$ 99/ano) pra TestFlight e App Store.
+- Regras das lojas: compras de itens digitais têm de ser pela Apple/Google (Pix só na
+  web); interface sem cara de site; política de privacidade.
+
 ## Rodar local
 
 ```bash
-node scripts/dev.mjs     # http://localhost:8787 — mesmo Worker, banco em .wrangler/dev.sqlite
+npm run dev   # (ou node scripts/dev.mjs) http://localhost:8787 — mesmo Worker, banco em .wrangler/dev.sqlite
 ```
 
 ## Banco de dados

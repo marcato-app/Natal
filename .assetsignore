@@ -11,3 +11,9 @@ package.json
 package-lock.json
 CLAUDE.md
 scripts/
+android/
+ios/
+www/
+.github/
+capacitor.config.json
+resources/

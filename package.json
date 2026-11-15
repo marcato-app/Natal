@@ -1,0 +1,26 @@
+{
+  "name": "vila-de-natal",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Jogo de construir vila de Natal (web + app Android/iOS via Capacitor)",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "test": "node test/regras.test.mjs && node test/api.test.mjs",
+    "app:web": "node scripts/app-web.mjs",
+    "app:sync": "node scripts/app-web.mjs && cap sync",
+    "app:android": "node scripts/app-web.mjs && cap sync android && cap open android",
+    "app:ios": "node scripts/app-web.mjs && cap sync ios && cap open ios"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.0",
+    "@capacitor/core": "8.6.0",
+    "@capacitor/haptics": "8.0.2",
+    "@capacitor/ios": "8.6.0",
+    "@capacitor/preferences": "8.0.1",
+    "@capacitor/splash-screen": "8.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.0"
+  }
+}

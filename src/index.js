@@ -108,17 +108,33 @@ route('POST', '/api/acoes', async (request, env) => {
 
 /* ------------------------------ entrada ------------------------------ */
 
+// O app (Capacitor) roda a página em capacitor://localhost (iOS) ou https://localhost
+// (Android) e chama a API deste domínio: só essas origens recebem CORS.
+const ORIGENS_APP = new Set(['capacitor://localhost', 'https://localhost', 'http://localhost']);
+function comCors(res, origem) {
+  if (!ORIGENS_APP.has(origem)) return res;
+  const out = new Response(res.body, res);
+  out.headers.set('Access-Control-Allow-Origin', origem);
+  out.headers.set('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  out.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  out.headers.set('Access-Control-Max-Age', '86400');
+  out.headers.append('Vary', 'Origin');
+  return out;
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname.startsWith('/api/')) {
+      const origem = request.headers.get('Origin') || '';
+      if (request.method === 'OPTIONS') return comCors(new Response(null, { status: 204 }), origem);
       const match = matchRoute(request.method, url.pathname);
-      if (!match) return notFound();
+      if (!match) return comCors(notFound(), origem);
       try {
-        return await match.handler(request, env, match.params);
+        return comCors(await match.handler(request, env, match.params), origem);
       } catch (err) {
         console.error(err);
-        return json({ error: 'Erro interno' }, { status: 500 });
+        return comCors(json({ error: 'Erro interno' }, { status: 500 }), origem);
       }
     }
     return env.ASSETS.fetch(request);

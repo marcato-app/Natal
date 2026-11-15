@@ -21,11 +21,32 @@ const NOME_RECURSO = { moedas: 'moedas', doces: 'doces', alegria: 'alegria' };
 
 /* ------------------------------ estado e servidor ------------------------------ */
 
+// No app (Capacitor) a página roda dentro do aparelho e fala com o servidor publicado.
+const NATIVO = !!window.Capacitor?.isNativePlatform?.();
+const API = NATIVO ? 'https://natal.flat-salad-71d3.workers.dev' : '';
+const plugin = (n) => window.Capacitor?.Plugins?.[n] || window.Capacitor?.registerPlugin?.(n) || null;
+
+// Armazenamento: no navegador, localStorage; no app, também o Preferences nativo (o
+// iPhone pode limpar o localStorage de um app, o Preferences ele não limpa).
 const LS_TOKEN = 'natal.token', LS_VILA = 'natal.vila', LS_FILA = 'natal.fila';
+const memo = {};
+let prefsNativo = null;
+async function prepararArmazenamento() {
+  prefsNativo = NATIVO ? plugin('Preferences') : null;
+  if (!prefsNativo) return;
+  for (const k of [LS_TOKEN, LS_VILA, LS_FILA]) {
+    try { const { value } = await prefsNativo.get({ key: k }); if (value != null) memo[k] = value; } catch { /* segue com o localStorage */ }
+  }
+}
 const ls = {
-  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-  set(k, v) { try { localStorage.setItem(k, v); } catch { /* sem armazenamento: segue sem cache */ } },
+  get(k) { if (k in memo) return memo[k]; try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) {
+    memo[k] = v;
+    try { localStorage.setItem(k, v); } catch { /* sem armazenamento: segue sem cache */ }
+    prefsNativo?.set({ key: k, value: v }).catch(() => {});
+  },
 };
+const vibrar = () => { try { plugin('Haptics')?.impact({ style: 'LIGHT' }); } catch { /* sem vibração */ } };
 
 let estado = null;        // a vila como o jogador vê agora
 let offset = 0;           // relógio do servidor - relógio local
@@ -36,7 +57,7 @@ const agora = () => Date.now() + offset;
 
 async function api(method, path, body) {
   const token = ls.get(LS_TOKEN);
-  const r = await fetch(path, {
+  const r = await fetch(API + path, {
     method,
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
     body: body ? JSON.stringify(body) : undefined,
@@ -57,6 +78,7 @@ function guardar() {
 }
 
 async function carregar() {
+  await prepararArmazenamento();
   try { fila = JSON.parse(ls.get(LS_FILA) || '[]'); } catch { fila = []; }
   try {
     if (ls.get(LS_TOKEN)) {
@@ -534,7 +556,7 @@ function coletar(id, ponto = null) {
   if (ponto) pos = { left: ponto.x, top: ponto.y, width: 0 };
   const r = agir({ tipo: 'coletar', id });
   if (!r.ok) return;
-  som.tocar('moeda');
+  som.tocar('moeda'); vibrar();
   if (pos) {
     Object.entries(r.ganho).forEach(([rec, q], i) => {
       const el = document.createElement('div'); el.className = 'voa';

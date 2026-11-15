@@ -95,5 +95,15 @@ check('mais de 50 ações = 400', (await call('POST', '/api/acoes', { token, bod
   check('outro jogador começa do zero', r.data.vila.predios.every(p => p.tipo !== 'padaria'));
 }
 
+// CORS só pro app
+{
+  const pre = await worker.fetch(new Request('https://natal.test/api/acoes', { method: 'OPTIONS', headers: { Origin: 'capacitor://localhost' } }), env);
+  check('preflight do app iOS ok', pre.status === 204 && pre.headers.get('Access-Control-Allow-Origin') === 'capacitor://localhost' && pre.headers.get('Access-Control-Allow-Headers').includes('Authorization'));
+  const r = await worker.fetch(new Request('https://natal.test/api/vila', { headers: { Origin: 'https://localhost', Authorization: 'Bearer ' + token } }), env);
+  check('resposta pro app Android traz CORS', r.status === 200 && r.headers.get('Access-Control-Allow-Origin') === 'https://localhost');
+  const x = await worker.fetch(new Request('https://natal.test/api/vila', { headers: { Origin: 'https://site-estranho.com', Authorization: 'Bearer ' + token } }), env);
+  check('outro site não recebe CORS', !x.headers.get('Access-Control-Allow-Origin'));
+}
+
 console.log(`\n${pass} ok, ${fail} falharam`);
 if (fail) process.exit(1);
