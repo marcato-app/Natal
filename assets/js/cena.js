@@ -1442,13 +1442,35 @@ export async function criarCena(canvas) {
   }
 
   // ruas
-  for (const r of RUAS) {
+  const calcadas = new THREE.Group();
+  RUAS.forEach((r, i) => {
     const w = r.w * T, h = r.h * T, c = centroLote(r.x, r.z, 1).add(V3((r.w - 1) * T / 2, 0, (r.h - 1) * T / 2));
-    const alongX = r.w >= r.h, wid = (alongX ? h : w) * 0.82;
+    const alongX = r.w >= r.h, wid = (alongX ? h : w) * 0.72;
     let len = alongX ? w : h;
     if (r === RUAS[0]) { len = 320; c.x = 0; }
     const m = new THREE.Mesh(new THREE.PlaneGeometry(wid, len), new THREE.MeshStandardMaterial({ map: rep(roadTex, 1, len / 6), roughness: 0.95 }));
-    m.rotation.x = -Math.PI / 2; if (alongX) m.rotation.z = Math.PI / 2; m.position.set(c.x, 0.03, c.z); m.receiveShadow = true; scene.add(m);
+    m.rotation.x = -Math.PI / 2; if (alongX) m.rotation.z = Math.PI / 2; m.position.set(c.x, 0.03 + i * 0.003, c.z); m.receiveShadow = true; scene.add(m);
+    // calçadas dos dois lados (guia branca com neve)
+    for (const sd of [-1, 1]) {
+      const off = (wid / 2 + 0.22) * sd, cw = alongX ? len : 0.44, cd = alongX ? 0.44 : len;
+      calcadas.add(caixa(cw, 0.12, cd, MR.calcada, c.x + (alongX ? 0 : off), 0.06, c.z + (alongX ? off : 0)));
+    }
+  });
+  fundir(calcadas); scene.add(calcadas);
+
+  // postes de rua (pretos, com lanterna) ao longo da rua principal
+  {
+    const postes = new THREE.Group(), RZ = centroLote(0, RUAS[0].z, 1).z;
+    for (let x = -110; x <= 110; x += 12) for (const sd of [-1, 1]) {
+      const pp = new THREE.Group(); pp.position.set(x + (sd > 0 ? 6 : 0), 0, RZ + sd * 1.55); pp.scale.setScalar(2.1);
+      pp.add(mR(new THREE.CylinderGeometry(0.05, 0.07, 1.6, 8), MR.preto, 0, 0.8, 0));
+      pp.add(caixa(0.24, 0.32, 0.24, MR.preto, 0, 1.75, 0));
+      pp.add(mR(new THREE.BoxGeometry(0.17, 0.24, 0.17), MR.lampada, 0, 1.75, 0));
+      pp.add(mR(new THREE.ConeGeometry(0.21, 0.16, 4), MR.preto, 0, 1.98, 0).rotateY(Math.PI / 4));
+      pp.add(mR(new THREE.ConeGeometry(0.14, 0.1, 8), snowMat, 0, 2.08, 0));
+      postes.add(pp);
+    }
+    fundir(postes); scene.add(postes);
   }
 
   // cerca em volta da vila (com abertura na rua da frente)
@@ -1471,6 +1493,7 @@ export async function criarCena(canvas) {
       const a = R(0, Math.PI * 2), d = R(borda + 6, 150), x = Math.cos(a) * d, z = Math.sin(a) * d;
       if (Math.max(Math.abs(x), Math.abs(z)) < borda + 5) continue;
       if (Math.abs(z - RUA_Z) < 6.5 || (z > TRILHO_Z - 7.5 && z < -borda - 3)) continue;
+      if (Math.abs(z - RUA_Z) < 17 && Math.abs(x) > borda + 6 && Math.abs(x) < borda + 82) continue; // bairro vizinho
       if (z > borda && Math.abs(x) < 6 && d < 55) continue;
       if (Math.abs(Math.atan2(z, x) - 0.86) < 0.55 && d < 65) continue;
       pts.push([x, z, R(1.0, 2.0) * (d > 60 ? 1.4 : 1)]);
@@ -1493,6 +1516,31 @@ export async function criarCena(canvas) {
     }
   }
 
+  // bairro vizinho: casas iluminadas e uma igreja dos dois lados da estrada, fora da cerca
+  {
+    const RZ = centroLote(0, RUAS[0].z, 1).z;
+    let k = 0;
+    for (const lado of [-1, 1]) for (let i = 0; i < 5; i++) for (const sd of [-1, 1]) {
+      const x = lado * (borda + 14 + i * 11), z = RZ + sd * 9;
+      const casa = makeHouse({ id: 'viz' + (k++), nv: 1 + ((i + k) % 3), itens: { pisca: 1 + (k % 2), guirlanda: 1, jardim: k % 3 ? 1 : 2 } });
+      casa.position.set(x, hAt(x, z), z); casa.rotation.y = sd > 0 ? Math.PI : 0; casa.scale.setScalar(1.15);
+      casa.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
+      scene.add(casa);
+    }
+    // igreja com torre
+    const ig = new THREE.Group(), x = -(borda + 74), z = RZ - 11; ig.position.set(x, hAt(x, z), z);
+    const par = new THREE.MeshStandardMaterial({ map: rep(rebocoTex, 2, 2), color: 0xf2efe8, roughness: 0.9 }), tel = new THREE.MeshStandardMaterial({ map: rep(telhaTex, 2, 2), color: 0x3c4048, roughness: 0.8 });
+    ig.add(caixa(6, 5, 11, par, 0, 2.5, 0));
+    const fr = frontaoR({ w: 6, d: 11, h: 3.2, parede: par, telha: tel }); fr.position.y = 5; ig.add(fr);
+    ig.add(caixa(2.4, 10, 2.4, par, 0, 5, 6));
+    ig.add(mR(new THREE.ConeGeometry(1.9, 5, 4), tel, 0, 12.5, 6).rotateY(Math.PI / 4));
+    ig.add(caixa(0.12, 1.4, 0.12, mat(0xe8b13a, { metalness: 0.8 }), 0, 15.6, 6)); ig.add(caixa(0.8, 0.12, 0.12, mat(0xe8b13a, { metalness: 0.8 }), 0, 15.8, 6));
+    for (const zz of [-3, 0, 3]) { const j = janelaR(0.9, 2.4, 1, 3); j.position.set(3.01, 2.4, zz); j.rotation.y = Math.PI / 2; ig.add(j); }
+    const porta = janelaR(1.4, 2.6, 2, 3); porta.position.set(0, 1.5, 7.21); ig.add(porta);
+    ledsFrontao(ig, fr);
+    fundir(ig); ig.rotation.y = Math.PI / 2; scene.add(ig);
+  }
+
   // trilho e trem
   {
     const trilhoM = mat(0x6a7080, { metalness: 0.6, roughness: 0.4 });
@@ -1507,9 +1555,10 @@ export async function criarCena(canvas) {
 
   // carros na rua principal (dois sentidos)
   const carros = [];
-  [[0xd8333a, true, 1], [0x2f7ad8, false, -1], [0x2f9e5b, false, 1], [0xf2a93b, true, -1], [0xf4f4f8, false, 1], [0x8a5cc8, false, -1]].forEach(([cor, arv, sent], i) => {
-    const c = makeCar(cor, arv); c.traverse(m => { if (m.isMesh) m.castShadow = !m.userData.noShadow; });
-    c.userData.sentido = sent; c.userData.vel = R(7, 10); c.position.set(-150 + i * 55, 0, RUA_Z + sent * 0.9); c.rotation.y = sent > 0 ? 0 : Math.PI;
+  [[0xd8333a, true, 1, 0], [0x1d3a6e, false, -1, 1], [0x2f9e5b, false, 1, 0], [0xf2a93b, true, -1, 0], [0x202226, false, 1, 1], [0xc0182c, false, -1, 1], [0xe8e8ea, false, 1, 1], [0x8a5cc8, true, -1, 0]].forEach(([cor, arv, sent, esportivo], i) => {
+    const c = esportivo ? (() => { const g = new THREE.Group(), e = carroEsportivo(cor); e.scale.setScalar(0.62); g.add(e); const f = mesh(new THREE.PlaneGeometry(4, 2.2), poolMat, 3.1, 0.06, 0); f.rotation.x = -Math.PI / 2; g.add(f); return g; })() : makeCar(cor, arv);
+    c.traverse(m => { if (m.isMesh) m.castShadow = !m.userData.noShadow; });
+    c.userData.sentido = sent; c.userData.vel = R(7, 10); c.position.set(-150 + i * 40, 0, RUA_Z + sent * 0.75); c.rotation.y = sent > 0 ? 0 : Math.PI;
     scene.add(c); carros.push(c);
   });
 

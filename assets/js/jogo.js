@@ -732,6 +732,7 @@ const baloes = new Map();
 function sincBaloes() {
   const vivos = new Set();
   if (visitando) { for (const el of baloes.values()) el.remove(); baloes.clear(); return; }
+  const livres = estado.duendes.some(d => !d.predio);
   for (const p of estado.predios) {
     const pr = TIPOS[p.tipo].prod, aluguel = aluguelDe(p);
     let html = null, cls = 'balao', rotulo = '';
@@ -747,7 +748,7 @@ function sincBaloes() {
     } else if (pr) {
       const k = prontos(p), n = duendesEm(estado, p.id);
       if (k >= 1) { html = `${svg(ICONE[pr.recurso])}+${fmt(k * pr.qtd)}`; rotulo = `Coletar ${fmt(k * pr.qtd)} ${NOME_RECURSO[pr.recurso]} de ${TIPOS[p.tipo].nome}`; }
-      else if (!n) { html = `${svg('i-sono')}sem duendes`; cls += ' parado'; rotulo = `${TIPOS[p.tipo].nome} sem duendes`; }
+      else if (!n && livres) { html = `${svg('i-sono')}sem duendes`; cls += ' parado'; rotulo = `${TIPOS[p.tipo].nome} sem duendes`; }
     }
     if (!html) continue;
     vivos.add(p.id);

@@ -17,6 +17,12 @@ export const MAX_ACOES = 50;        // por requisição
 export const RUAS = [
   { x: MAPA_MIN, z: 10, w: MAPA_MAX - MAPA_MIN, h: 1 },
   { x: 9, z: 11, w: 1, h: 7 },
+  // avenida em volta do mapa inteiro (nos terrenos de expansão) e a rua da frente até ela
+  { x: 9, z: TAMANHO, w: 1, h: EXPANSAO - 1 },
+  { x: MAPA_MIN, z: MAPA_MIN, w: MAPA_MAX - MAPA_MIN, h: 1 },
+  { x: MAPA_MIN, z: MAPA_MAX - 1, w: MAPA_MAX - MAPA_MIN, h: 1 },
+  { x: MAPA_MIN, z: MAPA_MIN + 1, w: 1, h: MAPA_MAX - MAPA_MIN - 2 },
+  { x: MAPA_MAX - 1, z: MAPA_MIN + 1, w: 1, h: MAPA_MAX - MAPA_MIN - 2 },
 ];
 
 // Alegria acumulada necessária pra cada nível: índice 0 = nível 1.
