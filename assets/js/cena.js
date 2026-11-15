@@ -831,6 +831,10 @@ function makeTreno() {
   noel.add(mesh(new THREE.TorusGeometry(0.27, 0.07, 6, 16), snowMat, 0, 1.4, 0).rotateX(Math.PI / 2));
   noel.add(mesh(new THREE.SphereGeometry(0.1, 8, 8), snowMat, -0.35, 1.85, 0));
   const braco = mesh(new THREE.CapsuleGeometry(0.1, 0.5, 3, 8), vermelho, 0.45, 0.8, 0.3); braco.rotation.z = -1.2; noel.add(braco);
+  for (const z of [-0.18, 0.18]) noel.add(mesh(new THREE.CylinderGeometry(0.1, 0.12, 0.45, 8), mat(0x1d1d24), 0, -0.05, z));
+  const bolsa = mesh(new THREE.SphereGeometry(0.32, 12, 10), new THREE.MeshStandardMaterial({ color: 0xffc94d, metalness: 0.6, roughness: 0.3, emissive: 0x3a2600 }), 0.55, 0.55, 0.35);
+  bolsa.add(mesh(new THREE.CylinderGeometry(0.1, 0.16, 0.18, 8), mat(0xc98f1a), 0, 0.32, 0)); bolsa.visible = false; noel.add(bolsa);
+  noel.userData.bolsa = bolsa;
   // saco de presentes
   const saco = mesh(new THREE.SphereGeometry(0.6, 12, 10), mat(0x8a5a3c, { roughness: 0.95 }), -1.0, 1.9, 0); saco.scale.set(1, 1.1, 1); treno.add(saco);
   const gf = makeGift(0.4, 0x2f9e5b, 0xffd166); gf.position.set(-1.0, 2.4, 0.2); treno.add(gf);
@@ -838,7 +842,7 @@ function makeTreno() {
   const renas = [];
   [[3.2, -0.5, false], [3.2, 0.5, false], [5.2, -0.5, false], [5.2, 0.5, false], [7.2, 0, true]].forEach(([x, z, n]) => { const r = makeRena(n); r.position.set(x, -0.2, z); r.scale.setScalar(0.85); g.add(r); renas.push(r); });
   for (const z of [-0.5, 0.5]) { const pts = [V3(1.0, 1.1, z * 0.8), V3(7.4, 1.2, 0)]; g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 4, 0.025, 4), ouro)); }
-  g.userData = { renas, treno };
+  g.userData = { renas, treno, noel, assento: noel.position.clone() };
   return shadowAll(g);
 }
 
@@ -1009,19 +1013,31 @@ export async function criarCena(canvas) {
   });
 
   // Papai Noel
-  const treno = makeTreno(); treno.visible = false; treno.scale.setScalar(1.6); scene.add(treno);
-  const noel = { voando: false, rota: [], i: 0, espera: 0, aoChegar: null, alvoAtual: null };
+  const treno = makeTreno(); treno.visible = false; treno.scale.setScalar(0.85); scene.add(treno);
+  const noel = { voando: false, rota: [], i: 0, fase: 'ir', tempo: 0, aoChegar: null };
+  const figura = treno.userData.noel;
+  const fuligem = [];
+  for (let i = 0; i < 8; i++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: 0x6a6f80, transparent: true, depthWrite: false, opacity: 0 })); sp.visible = false; scene.add(sp); fuligem.push(sp); }
   const brilhoN = 60, brilhoGeo = new THREE.BufferGeometry(), brilhoPos = new Float32Array(brilhoN * 3), brilhoVida = new Float32Array(brilhoN);
   brilhoGeo.setAttribute('position', new THREE.BufferAttribute(brilhoPos, 3));
   const brilho = new THREE.Points(brilhoGeo, new THREE.PointsMaterial({ size: 0.5, map: flakeTex, color: 0xffd76a, transparent: true, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }));
   scene.add(brilho); let brilhoI = 0;
   const presentesCaindo = [];
-  function papaiNoel(alvos, aoChegar) {
+  function papaiNoel(alvos, aoChegar, opcoes = {}) {
     if (noel.voando) return false;
     const lado = rnd() < 0.5 ? -1 : 1;
-    noel.rota = [{ pos: V3(-150 * lado, 34, -40), id: null }, ...alvos.map(a => ({ pos: a.pos.clone().add(V3(0, 3.2, 0)), id: a.id, chao: a.pos.clone() })), { pos: V3(150 * lado, 38, 50), id: null, fim: true }];
-    noel.i = 1; noel.voando = true; noel.espera = 0; noel.aoChegar = aoChegar;
-    treno.position.copy(noel.rota[0].pos); treno.visible = true;
+    // em cada casa: pousa no telhado (do lado oposto à chaminé), desce pela chaminé e volta
+    const paradas = alvos.map(a => {
+      const e = predios.get(a.id); if (!e) return null;
+      const c = e.obj.position, ch = a.pos.clone();
+      const dir = V3(c.x - ch.x, 0, c.z - ch.z); if (dir.lengthSq() < 0.01) dir.set(1, 0, 0); dir.normalize();
+      const pouso = V3(c.x + dir.x * 1.2, ch.y - 0.75, c.z + dir.z * 1.2);
+      return { id: a.id, chamine: ch, pouso, acima: pouso.clone().add(V3(0, 7, 0)) };
+    }).filter(Boolean);
+    noel.rota = [...paradas, { fim: true, acima: V3(150 * lado, 24, 50) }];
+    noel.i = 0; noel.fase = 'ir'; noel.tempo = 0; noel.voando = true; noel.aoChegar = aoChegar;
+    treno.position.set(-150 * lado, 22, -40); treno.visible = true;
+    if (opcoes.perto && paradas[0]) treno.position.copy(paradas[0].acima).add(V3(-12, 0, 0)); // só pros testes
     return true;
   }
   function chamineDe(id) { const e = predios.get(id); if (!e || !e.obj.userData.smoke) return null; e.obj.updateMatrixWorld(true); return e.obj.localToWorld(e.obj.userData.smoke[0].clone()).add(V3(0, -0.6, 0)); }
@@ -1453,32 +1469,72 @@ export async function criarCena(canvas) {
         if (andarAte(o, m.alvo, dt, t, 1.8, m.idx)) u.arms.forEach(b => b.rotation.x = 0);
       }
     }
-    // Papai Noel
+    // Papai Noel: voa até a casa, pousa no telhado, desce pela chaminé, volta com o aluguel
     if (noel.voando) {
-      const alvo = noel.rota[noel.i];
-      if (noel.espera > 0) {
-        noel.espera -= dt;
-        treno.position.y = alvo.pos.y + Math.sin(t * 3) * 0.15;
-        if (noel.espera <= 0) noel.i++;
-      } else {
-        const d = alvo.pos.clone().sub(treno.position), dist = d.length(), v = Math.min(dist, dt * (alvo.fim ? 20 : 16));
-        if (dist > 0.05) {
-          treno.position.addScaledVector(d.normalize(), v);
+      const parada = noel.rota[noel.i];
+      const voarPara = (alvo, vel) => {
+        const d = alvo.clone().sub(treno.position), dist = d.length();
+        if (dist < 0.05) return true;
+        treno.position.addScaledVector(d.normalize(), Math.min(dist, dt * vel));
+        if (Math.abs(d.y) < 0.9) {
           const yaw = Math.atan2(-d.z, d.x), dif = ((yaw - treno.rotation.y + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
-          treno.rotation.y += THREE.MathUtils.clamp(dif, -dt * 3, dt * 3);
-        } else if (alvo.fim) { noel.voando = false; treno.visible = false; }
-        else if (alvo.id) {
-          noel.espera = 1.3;
-          const gf = makeGift(0.45, [0xd8333a, 0x2f9e5b, 0x4f7fe0][presentesCaindo.length % 3], 0xffd166); gf.position.copy(treno.position).add(V3(0, -0.4, 0)); scene.add(gf);
-          presentesCaindo.push({ obj: gf, ate: alvo.chao.y + 0.4, vida: 1.2 });
-          if (noel.aoChegar) noel.aoChegar(alvo.id);
-        } else noel.i++;
+          treno.rotation.y += THREE.MathUtils.clamp(dif, -dt * 2.5, dt * 2.5);
+        }
+        return false;
+      };
+      const proxFase = (f) => { noel.fase = f; noel.tempo = 0; };
+      noel.tempo += dt;
+      const k = Math.min(1, noel.tempo / 0.9);
+      if (noel.fase === 'ir') {
+        if (voarPara(parada.acima, 14)) { if (parada.fim) { noel.voando = false; treno.visible = false; } else proxFase('pousar'); }
+      } else if (noel.fase === 'pousar') {
+        if (voarPara(parada.pouso, 4.5)) { scene.attach(figura); parada.de = figura.position.clone(); parada.boca = parada.chamine.clone().add(V3(0, 0.15, 0)); proxFase('sair'); }
+      } else if (noel.fase === 'sair') {
+        // pula do trenó até a boca da chaminé
+        figura.position.lerpVectors(parada.de, parada.boca, k); figura.position.y += Math.sin(k * Math.PI) * 1.0;
+        figura.rotation.y = Math.atan2(parada.boca.x - parada.de.x, parada.boca.z - parada.de.z) - Math.PI / 2;
+        if (k >= 1) proxFase('descer');
+      } else if (noel.fase === 'descer') {
+        figura.position.copy(parada.boca); figura.position.y -= k * 2.2; figura.rotation.y += dt * 4;
+        if (k >= 1) {
+          figura.visible = false; proxFase('dentro');
+          if (noel.aoChegar) noel.aoChegar(parada.id);
+          fuligem.forEach((sp, i) => { sp.visible = true; sp.userData.vida = -i * 0.12; });
+        }
+      } else if (noel.fase === 'dentro') {
+        if (noel.tempo > 1.3) { figura.visible = true; figura.userData.bolsa.visible = true; proxFase('subir'); }
+      } else if (noel.fase === 'subir') {
+        figura.position.copy(parada.boca); figura.position.y -= (1 - k) * 2.2; figura.rotation.y -= dt * 4;
+        if (k >= 1) proxFase('voltar');
+      } else if (noel.fase === 'voltar') {
+        figura.position.lerpVectors(parada.boca, parada.de, k); figura.position.y += Math.sin(k * Math.PI) * 1.0;
+        if (k >= 1) {
+          treno.userData.treno.attach(figura);
+          figura.position.copy(treno.userData.assento); figura.rotation.set(0, 0, 0); figura.userData.bolsa.visible = false;
+          proxFase('decolar');
+        }
+      } else if (noel.fase === 'decolar') {
+        if (voarPara(parada.acima, 6)) { noel.i++; proxFase('ir'); }
       }
-      treno.userData.renas.forEach((r, i) => { r.position.y = -0.2 + Math.sin(t * 6 + i) * 0.12; });
-      // rastro de brilho
-      const atras = treno.localToWorld(V3(-1.5, 0.6, 0));
-      brilhoPos[brilhoI * 3] = atras.x + R(-0.3, 0.3); brilhoPos[brilhoI * 3 + 1] = atras.y + R(-0.3, 0.3); brilhoPos[brilhoI * 3 + 2] = atras.z + R(-0.3, 0.3); brilhoVida[brilhoI] = 1;
-      brilhoI = (brilhoI + 1) % brilhoN;
+      const pousado = noel.fase !== 'ir' && noel.fase !== 'pousar' && noel.fase !== 'decolar';
+      treno.userData.renas.forEach((r, i) => { r.position.y = -0.2 + (pousado ? 0 : Math.sin(t * 6 + i) * 0.12); });
+      // rastro de brilho (só voando)
+      if (!pousado) {
+        const atras = treno.localToWorld(V3(-1.5, 0.6, 0));
+        brilhoPos[brilhoI * 3] = atras.x + R(-0.3, 0.3); brilhoPos[brilhoI * 3 + 1] = atras.y + R(-0.3, 0.3); brilhoPos[brilhoI * 3 + 2] = atras.z + R(-0.3, 0.3); brilhoVida[brilhoI] = 1;
+        brilhoI = (brilhoI + 1) % brilhoN;
+      }
+      // fuligem saindo da chaminé quando ele entra
+      const pc = noel.rota[noel.i];
+      fuligem.forEach((sp) => {
+        if (!sp.visible || !pc || !pc.chamine) return;
+        sp.userData.vida += dt * 0.9;
+        const v = sp.userData.vida;
+        if (v < 0) { sp.material.opacity = 0; return; }
+        if (v > 1) { sp.visible = false; return; }
+        sp.position.copy(pc.chamine).add(V3(Math.sin(v * 7) * 0.3, 0.3 + v * 2.5, 0));
+        const sc = 0.5 + v * 1.6; sp.scale.set(sc, sc, 1); sp.material.opacity = Math.sin(v * Math.PI) * 0.7;
+      });
     }
     for (let i = 0; i < brilhoN; i++) { if (brilhoVida[i] > 0) { brilhoVida[i] -= dt * 0.8; brilhoPos[i * 3 + 1] -= dt * 0.6; if (brilhoVida[i] <= 0) brilhoPos[i * 3 + 1] = -100; } }
     brilhoGeo.attributes.position.needsUpdate = true;

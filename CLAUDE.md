@@ -38,7 +38,8 @@ Three.js (0.160.0) vem do jsDelivr pelo importmap do `index.html`.
 - **Aluguel e Papai Noel**: casa com pelo menos um enfeite de fachada rende aluguel
   (`aluguelDe()`, acumula em `prog` como a produção). A cada ~18 s o navegador manda
   o trenó (`cena.papaiNoel`) pelas chaminés das casas com aluguel pronto; em cada uma
-  ele larga um presente e o jogo faz a ação `coletar` daquela casa. Sem casa pronta,
+  ele pousa no telhado, desce pela chaminé (o jogo faz a ação `coletar` daquela casa),
+  volta com o saco de moedas e decola pra próxima. Sem casa pronta,
   ele só passeia de vez em quando.
 - **Vida na vila** (só visual, em `cena.js`): carros na rua principal, que segue pela
   floresta; trem a vapor com vagões de presentes no trilho atrás da vila; moradores
