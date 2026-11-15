@@ -37,7 +37,7 @@ try {
     const p = await ctx.newPage();
     const erros = [], externos = new Set();
     p.on('pageerror', e => erros.push(e.message));
-    p.on('request', r => { const h = new URL(r.url()).hostname; if (h !== 'localhost') externos.add(h); });
+    p.on('request', r => { const u = new URL(r.url()); if (!['blob:', 'data:'].includes(u.protocol) && u.hostname !== 'localhost') externos.add(u.hostname); });
     await p.addInitScript(() => localStorage.setItem('natal.boasvindas', '1'));
     await p.goto(URL_JOGO);
     await p.waitForSelector('#carregando.fora', { timeout: 180000 });

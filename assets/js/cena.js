@@ -11,6 +11,8 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { TAMANHO, RUAS, TIPOS, ITENS, MAPA_MIN, MAPA_MAX, TERRENOS } from './regras.js';
 
 export const T = 2.5; // tamanho de um lote em unidades do mundo
@@ -440,6 +442,155 @@ function makeHouse(p = {}) {
   addPool(g, xPorta * 0.5, 2.6, 5);
   g.userData.smoke = [V3(chX * 0.5, (base + 8.6) * 0.5, -2.2 * 0.5 - 1.0)];
   g.userData.altura = nv >= 3 ? 6.4 : 5;
+  return g;
+}
+
+// ---------- modelos 3D prontos (.glb) ----------
+// Carregam em segundo plano; enquanto não chegam, o prédio usa o modelo feito por código.
+// Cada modelo pronto é preparado uma vez (medidas, janelas, beirais, telhado) e depois
+// clonado por prédio, dividindo geometria e materiais.
+const PRONTOS = {};
+let aoCarregarPronto = () => {};
+function carregarPronto(nome, url, preparar) {
+  const l = new GLTFLoader(); l.setMeshoptDecoder(MeshoptDecoder);
+  l.load(url, (g) => { try { PRONTOS[nome] = preparar(g.scene); aoCarregarPronto(nome); } catch (e) { console.warn('modelo pronto', nome, e); } }, undefined, (e) => console.warn('modelo pronto', nome, e));
+}
+// posições de uma malha em Float32, já no espaço da raiz do modelo (os .glb vêm quantizados)
+function posicoesEm(raiz, m) {
+  const g = m.geometry, pos = g.attributes.position, idx = g.index, v = new THREE.Vector3(), out = [];
+  m.updateWorldMatrix(true, false);
+  const mt = new THREE.Matrix4().copy(raiz.matrixWorld).invert().multiply(m.matrixWorld);
+  const n = idx ? idx.count : pos.count;
+  for (let i = 0; i < n; i++) { v.fromBufferAttribute(pos, idx ? idx.getX(i) : i).applyMatrix4(mt); out.push(v.x, v.y, v.z); }
+  return out; // triângulos soltos (3 vértices cada)
+}
+const LUZ_JANELA = new THREE.MeshStandardMaterial({ color: 0x2b2116, emissive: 0xffb45e, emissiveIntensity: 0.85, roughness: 0.25, metalness: 0.2 });
+LUZ_JANELA.userData.compartilhado = true;
+
+function prepararCasa3(cena) {
+  const raiz = new THREE.Group(); raiz.add(cena); raiz.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(cena), c = box.getCenter(new THREE.Vector3());
+  cena.position.set(-c.x, -box.min.y, -c.z); raiz.updateMatrixWorld(true);
+  const tam = box.getSize(new THREE.Vector3());
+  let telhado = null; const vidros = [];
+  cena.traverse(o => {
+    if (!o.isMesh) return;
+    o.geometry.userData.compartilhado = true;
+    const m = o.material; m.userData.compartilhado = true;
+    for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) if (m[k]) m[k].userData.compartilhado = true;
+    if (/vidro/i.test(m.name)) { o.material = LUZ_JANELA; vidros.push(o); }
+    if (/roof/i.test(m.name)) telhado = o;
+  });
+  // neve: os triângulos do telhado virados pra cima, levantados um pouco
+  const tri = telhado ? posicoesEm(raiz, telhado) : [];
+  const neve = [], a = new THREE.Vector3(), b = new THREE.Vector3(), d = new THREE.Vector3(), nrm = new THREE.Vector3();
+  for (let i = 0; i < tri.length; i += 9) {
+    a.set(tri[i], tri[i + 1], tri[i + 2]); b.set(tri[i + 3], tri[i + 4], tri[i + 5]); d.set(tri[i + 6], tri[i + 7], tri[i + 8]);
+    nrm.subVectors(b, a).cross(d.clone().sub(a)).normalize();
+    if (nrm.y < 0.35) continue;
+    for (const p of [a, b, d]) neve.push(p.x + nrm.x * 0.12, p.y + nrm.y * 0.12, p.z + nrm.z * 0.12);
+  }
+  const neveGeo = new THREE.BufferGeometry(); neveGeo.setAttribute('position', new THREE.Float32BufferAttribute(neve, 3)); neveGeo.computeVertexNormals(); neveGeo.userData.compartilhado = true;
+  // beirais: arestas de borda do telhado, horizontais, com o resto do triângulo acima
+  const chave = (x, y, z) => `${Math.round(x * 50)},${Math.round(y * 50)},${Math.round(z * 50)}`;
+  const arestas = new Map();
+  for (let i = 0; i < tri.length; i += 9) {
+    const vs = [0, 1, 2].map(k => [tri[i + k * 3], tri[i + k * 3 + 1], tri[i + k * 3 + 2]]);
+    for (let k = 0; k < 3; k++) {
+      const p = vs[k], q = vs[(k + 1) % 3], r = vs[(k + 2) % 3];
+      const kp = chave(...p), kq = chave(...q), ch = kp < kq ? kp + '|' + kq : kq + '|' + kp;
+      const e = arestas.get(ch); if (e) e.n++; else arestas.set(ch, { n: 1, p, q, r });
+    }
+  }
+  const beirais = [];
+  for (const { n, p, q, r } of arestas.values()) {
+    if (n !== 1) continue;
+    const comp = Math.hypot(q[0] - p[0], q[2] - p[2]);
+    if (comp < 0.4 || Math.abs(q[1] - p[1]) > 0.05 * comp) continue;
+    if (r[1] < Math.max(p[1], q[1]) + 0.05) continue; // cumeeira, não beiral
+    beirais.push([new THREE.Vector3(...p), new THREE.Vector3(...q)]);
+  }
+  // janelas: grupos de vidro virados pra frente (+z); a porta é o mais baixo e alto
+  const paineis = [];
+  for (const o of vidros) {
+    const t = posicoesEm(raiz, o);
+    for (let i = 0; i < t.length; i += 9) {
+      a.set(t[i], t[i + 1], t[i + 2]); b.set(t[i + 3], t[i + 4], t[i + 5]); d.set(t[i + 6], t[i + 7], t[i + 8]);
+      nrm.subVectors(b, a).cross(d.clone().sub(a)).normalize();
+      if (Math.abs(nrm.z) < 0.8) continue;
+      const bb = new THREE.Box3().setFromPoints([a, b, d]);
+      const junto = paineis.find(x => x.box.clone().expandByScalar(0.35).intersectsBox(bb));
+      if (junto) junto.box.union(bb); else paineis.push({ box: bb });
+    }
+  }
+  for (let mudou = true; mudou;) { mudou = false; for (let i = 0; i < paineis.length && !mudou; i++) for (let j = i + 1; j < paineis.length; j++) if (paineis[i].box.clone().expandByScalar(0.35).intersectsBox(paineis[j].box)) { paineis[i].box.union(paineis[j].box); paineis.splice(j, 1); mudou = true; break; } }
+  const frente = paineis.filter(x => x.box.max.z > tam.z * 0.1);
+  frente.sort((x, y) => x.box.min.y - y.box.min.y || (y.box.max.y - y.box.min.y) - (x.box.max.y - x.box.min.y));
+  const porta = frente.length && frente[0].box.min.y < tam.y * 0.25 ? frente.shift() : null;
+  // ponto alto do telhado pra chaminé (raio de cima pra baixo, um pouco atrás da cumeeira)
+  const ray = new THREE.Raycaster(), alvos = telhado ? [telhado] : [];
+  let chamine = null;
+  for (let x = -tam.x * 0.3; x <= tam.x * 0.1 && telhado; x += tam.x * 0.05) for (let z = -tam.z * 0.35; z <= 0; z += tam.z * 0.05) {
+    ray.set(V3(x, 50, z).applyMatrix4(raiz.matrixWorld), V3(0, -1, 0)); const h = ray.intersectObjects(alvos, false)[0];
+    if (h) { const y = raiz.worldToLocal(h.point.clone()).y; if (!chamine || y > chamine.y + 0.3) chamine = V3(x, y, z); }
+  }
+  if (chamine) { // desce do pico pra ficar encostada no telhado
+    chamine.z -= tam.z * 0.12; ray.set(V3(chamine.x, 50, chamine.z).applyMatrix4(raiz.matrixWorld), V3(0, -1, 0));
+    const h = ray.intersectObjects(alvos, false)[0]; if (h) chamine.y = raiz.worldToLocal(h.point.clone()).y;
+  }
+  return { cena, tam, neveGeo, beirais, janelas: frente.map(x => x.box), porta: porta && porta.box, chamine };
+}
+carregarPronto('casa3', '/assets/modelos/casa3.glb', prepararCasa3);
+
+// Casa nível 3 com o modelo pronto ("American House", AleixoAlonso, CC BY 4.0) e os enfeites
+// de fachada do jogo presos no próprio modelo.
+function makeCasaPronta(p = {}) {
+  const P = PRONTOS.casa3, it = p.itens || {}, hv = hashId(p.id || 'vitrine');
+  const k = 7.4 / P.tam.x, espelho = (hv >> 3) % 2 ? -1 : 1;
+  const g = new THREE.Group(), casa = new THREE.Group(); g.add(casa);
+  casa.scale.set(k * espelho, k, k); casa.position.z = -0.3;
+  casa.add(P.cena.clone());
+  const neve = new THREE.Mesh(P.neveGeo, snowMat); neve.userData.noShadow = true; casa.add(neve);
+  const W = (v) => V3(v.x * k * espelho, v.y * k, v.z * k - 0.3); // modelo → prédio
+  // chaminé de tijolo
+  if (P.chamine) {
+    const ch = W(P.chamine), alt = 1.25;
+    g.add(caixa(0.45, alt, 0.45, tijolo, ch.x, ch.y + alt / 2 - 0.35, ch.z));
+    g.add(caixa(0.58, 0.1, 0.58, MR.preto, ch.x, ch.y + alt - 0.3, ch.z));
+    g.userData.smoke = [V3(ch.x, ch.y + alt - 0.2, ch.z)];
+  }
+  // pisca-pisca nos beirais: 1 = só os da frente, quente; 2 = todos, colorido
+  if (it.pisca) {
+    const pts = [];
+    for (const [a, b] of P.beirais) {
+      const A = W(a), B = W(b), meio = A.clone().add(B).multiplyScalar(0.5);
+      if (it.pisca < 2 && meio.z < 0.2) continue;
+      const n = Math.max(2, Math.round(A.distanceTo(B) / 0.28));
+      for (let i = 0; i <= n; i++) pts.push(A.clone().lerp(B, i / n).add(V3(0, -0.05, 0)));
+    }
+    const colorido = it.pisca >= 2, im = new THREE.InstancedMesh(new THREE.SphereGeometry(0.055, 6, 4), colorido ? bulbMat : ledQuente, pts.length), m4 = new THREE.Matrix4();
+    const CORES = [0xff3b3b, 0x3bff6a, 0x3b8bff, 0xffd23b, 0xff7bf0];
+    pts.forEach((q, i) => { m4.makeTranslation(q.x, q.y, q.z); im.setMatrixAt(i, m4); if (colorido) im.setColorAt(i, new THREE.Color(CORES[i % CORES.length]).multiplyScalar(2.2)); });
+    im.userData.noShadow = true; g.add(im);
+  }
+  if (it.guirlanda && P.porta) { const c = W(P.porta.getCenter(V3())), gl = guirlandaR(0.24); gl.position.set(c.x, W(P.porta.max).y + 0.12, W(P.porta.max).z + 0.06); g.add(gl); }
+  if (it.velas) for (const bx of P.janelas) { const c = W(bx.getCenter(V3())), v = candle(); v.scale.setScalar(0.9); v.position.set(c.x, W(bx.min).y + 0.02, W(bx.max).z + 0.05); g.add(v); }
+  // jardim: arbustos com neve na frente; nível 2 do jardim põe pinheiros, postes e o carro
+  const frenteZ = P.tam.z / 2 * k - 0.3, portaX = P.porta ? W(P.porta.getCenter(V3())).x : 0;
+  for (let x = -3.4; x <= 3.4; x += 0.6) {
+    if (Math.abs(x - portaX) < 0.9 || x * espelho > 0.6) continue; // não tampa a porta nem a garagem
+    const b = arbustoR(0.26); b.position.set(x, 0.25, frenteZ + 0.35); g.add(b);
+    const n = arbustoR(0.18, snowMat); n.scale.y = 0.35; n.position.set(x, 0.47, frenteZ + 0.35); g.add(n);
+  }
+  if (it.jardim) {
+    for (const dx of [-0.9, 0.9]) { const pj = posteJardim(); pj.scale.setScalar(0.6); pj.position.set(portaX + dx, 0, frenteZ + 1.0); g.add(pj); }
+    if (it.jardim >= 2) {
+      for (const x of [-3.5 * espelho]) { const c = conePinheiro(0.45, 2.4); c.position.set(x, 0, frenteZ - 0.4); g.add(c); }
+      const car = carroEsportivo([0xc0182c, 0x1d3a6e, 0x202226, 0xe8e8ea][hv % 4]); car.scale.setScalar(0.3); car.position.set(1.9 * espelho, 0.03, frenteZ + 1.1); car.rotation.y = Math.PI / 2; g.add(car);
+    }
+  }
+  addPool(g, portaX, frenteZ + 0.6, 2.5);
+  g.userData.altura = P.tam.y * k + 1.2;
   return g;
 }
 
@@ -1094,7 +1245,7 @@ function makePadariaReal() {
 function makeRinqueReal() {
   const g = new THREE.Group(), gelo = new THREE.MeshStandardMaterial({ color: 0xa8d8ff, roughness: 0.05, metalness: 0.2, emissive: 0x16344f, emissiveIntensity: 0.5 }), mureta = mat(0xf4f4f2, { roughness: 0.6 });
   g.add(caixa(9.6, 0.15, 9.6, snowMat, 0, 0.07, 0));
-  g.add(rbox(7.6, 0.12, 5.6, 0.05, gelo, 0, 0.2, -0.8));
+  g.add(mR(rbox(7.6, 0.12, 5.6, 0.05), gelo, 0, 0.2, -0.8));
   for (const [w, d, x, z] of [[7.8, 0.15, 0, -3.65], [7.8, 0.15, 0, 2.05], [0.15, 5.8, -3.9, -0.8], [0.15, 5.8, 3.9, -0.8]]) { g.add(caixa(w, 0.6, d, mureta, x, 0.5, z)); g.add(caixa(w, 0.1, d, mat(0xc8202a), x, 0.82, z)); }
   for (const [x, z] of [[-4.3, -4], [4.3, -4], [-4.3, 2.4], [4.3, 2.4]]) {
     g.add(mR(new THREE.CylinderGeometry(0.07, 0.09, 4.4, 8), MR.preto, x, 2.2, z));
@@ -1130,7 +1281,7 @@ function makeCarReal(cor, comArvore, suv) {
 }
 
 export const MODELOS = {
-  praca: makePlaza, casa: makeHouse, fabrica: makeFactory, padaria: makePadariaReal, rinque: makeRinqueReal,
+  praca: makePlaza, casa: (p) => (p && (p.nv || 1) >= 3 && PRONTOS.casa3 ? makeCasaPronta(p) : makeHouse(p)), fabrica: makeFactory, padaria: makePadariaReal, rinque: makeRinqueReal,
   correio: makeCorreio, confeitaria: makeConfeitaria, loja: makeLoja, estacao: makeEstacao, mercado: makeMercado, renas: makeRenas,
   pista: makePista, presepio: makePresepio, igreja: makeIgreja, roda: makeRoda, chafariz: makeChafariz, teatro: makeTeatro, arvoreGigante: makeArvoreGigante,
   castelo: makeCastelo, arco: makeArco, pousada: makePousada, estatua: makeEstatua, oficina: makeOficina,
@@ -1891,6 +2042,7 @@ export async function criarCena(canvas) {
     obj.position.set(c.x, 0, c.z); obj.rotation.y = -(p.r || 0) * Math.PI / 2;
   }
 
+  aoCarregarPronto = () => { for (const e of predios.values()) e.chave = ''; if (vilaAtual) sincronizar(vilaAtual); };
   function sincronizar(vila) {
     vilaAtual = vila;
     sincTerrenos(vila);

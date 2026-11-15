@@ -66,6 +66,14 @@ então nada vem de CDN; `sw.js` guarda tudo no aparelho pra abrir offline.
   (`(orientation: landscape) and (max-height: 520px)`): botões numa coluna à direita,
   painéis do lado, e a cena desloca pro lado livre (`setDeslocamento`).
 - **20 níveis** (`NIVEIS`) com prédios novos até o castelo; a oficina produz estrelas.
+- **Modelos prontos (.glb)** em `assets/modelos/`, carregados por `carregarPronto()` em `cena.js`
+  (GLTFLoader + meshopt, vendorizados em `assets/vendor/three/addons/`). Enquanto não chegam,
+  o prédio usa o modelo feito por código. Hoje: a casa nível 3 (`casa3.glb`, "American House" de
+  AleixoAlonso, Sketchfab, CC BY 4.0, crédito nos Ajustes). `prepararCasa3` acha sozinho no modelo
+  as janelas (acesas), os beirais (pisca-pisca), a porta (guirlanda), o telhado (neve) e o lugar
+  da chaminé (Papai Noel); metade das casas sai espelhada. Pra trazer outro: baixar do Sketchfab,
+  tirar interior e vidro com transmissão, texturas 512 em WebP e meshopt (`@gltf-transform`),
+  mirar em menos de 1 MB.
 - **Igreja** (`igreja`, nível 9, 4×4): o mesmo modelo da igreja do bairro vizinho (`makeIgreja`).
   **Presépio** com Sagrada Família, boi e burrinho, reis magos, pastor e estrela guia.
 - **Desempenho**: `criarModelo` passa todo prédio por `otimizar()`, que junta as peças paradas

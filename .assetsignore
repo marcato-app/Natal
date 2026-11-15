@@ -17,3 +17,5 @@ www/
 .github/
 capacitor.config.json
 resources/
+.e2e/
+telas-noite/
