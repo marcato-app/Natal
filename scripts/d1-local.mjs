@@ -7,7 +7,14 @@ export function bancoLocal(arquivo = ':memory:') {
   const db = new DatabaseSync(arquivo);
   db.exec('PRAGMA foreign_keys = ON'); // D1 liga por padrão
   const dir = new URL('../migrations/', import.meta.url);
-  for (const f of readdirSync(dir).sort()) db.exec(readFileSync(new URL(f, dir), 'utf8'));
+  // guarda quais migrações já rodaram, pra o banco do servidor local abrir de novo
+  db.exec('CREATE TABLE IF NOT EXISTS _migracoes (nome TEXT PRIMARY KEY)');
+  const feitas = new Set(db.prepare('SELECT nome FROM _migracoes').all().map(r => r.nome));
+  for (const f of readdirSync(dir).filter(f => f.endsWith('.sql')).sort()) {
+    if (feitas.has(f)) continue;
+    db.exec(readFileSync(new URL(f, dir), 'utf8'));
+    db.prepare('INSERT INTO _migracoes (nome) VALUES (?)').run(f);
+  }
   return db;
 }
 

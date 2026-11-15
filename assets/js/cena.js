@@ -472,6 +472,58 @@ function fundir(grupo) {
 }
 
 
+// Junta as peças paradas de um prédio que têm material equivalente (mesma cor, textura,
+// acabamento...), pra placa de vídeo desenhar poucas peças por prédio. Não mexe em nada
+// citado no userData (partes animadas como a roda-gigante, a estrela, o guindaste) nem
+// em peças com cor por vértice ou instanciadas.
+const texChave = (t) => t ? [t.source.uuid, t.repeat.x, t.repeat.y, t.offset.x, t.offset.y, t.rotation, t.wrapS, t.wrapT].join(',') : '';
+function assinatura(m) {
+  const cor = (c) => c ? [c.r, c.g, c.b].map(x => x.toFixed(3)).join(',') : '';
+  return [m.type, cor(m.color), cor(m.emissive), m.emissiveIntensity, m.roughness, m.metalness,
+    texChave(m.map), texChave(m.emissiveMap), texChave(m.normalMap), m.transparent, m.opacity, m.side,
+    m.flatShading, m.depthWrite, m.alphaTest, m.toneMapped, m.envMapIntensity].join('|');
+}
+function otimizar(raiz) {
+  const protegidos = new Set();
+  const marcar = (x, fundo = 0) => {
+    if (!x || typeof x !== 'object' || fundo > 3) return;
+    if (x.isObject3D) { x.traverse(o => protegidos.add(o)); return; }
+    if (x.isMaterial) { protegidos.add(x); return; }
+    for (const k of Object.keys(x)) marcar(x[k], fundo + 1);
+  };
+  raiz.traverse(o => { for (const [k, val] of Object.entries(o.userData)) if (k !== 'noShadow') marcar(val); });
+  raiz.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(raiz.matrixWorld).invert(), grupos = new Map(), remover = [];
+  raiz.traverse(o => {
+    if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || protegidos.has(o) || Array.isArray(o.material)) return;
+    const m = o.material;
+    if (m.vertexColors || o.geometry.morphAttributes.position || !o.geometry.attributes.position) return;
+    const chave = (protegidos.has(m) ? m.uuid : assinatura(m)) + '|' + !!o.userData.noShadow + '|' + o.castShadow;
+    if (!grupos.has(chave)) grupos.set(chave, { m, noShadow: !!o.userData.noShadow, cast: o.castShadow, lista: [] });
+    grupos.get(chave).lista.push(o);
+  });
+  for (const g of grupos.values()) {
+    if (g.lista.length < 2) continue;
+    const geos = g.lista.map(o => {
+      const geo = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+      for (const k of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv'].includes(k)) geo.deleteAttribute(k);
+      if (!geo.attributes.normal) geo.computeVertexNormals();
+      if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
+      geo.clearGroups();
+      geo.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+      return geo;
+    });
+    const junto = mergeGeometries(geos, false); geos.forEach(x => x.dispose());
+    if (!junto) continue;
+    const mm = new THREE.Mesh(junto, g.m); mm.castShadow = g.cast; mm.receiveShadow = true; if (g.noShadow) mm.userData.noShadow = true;
+    raiz.add(mm);
+    remover.push(...g.lista);
+  }
+  // as peças antigas saem; geometria só é liberada se não for compartilhada com outros modelos
+  for (const o of remover) { o.parent.remove(o); if (!o.geometry.userData.compartilhado) o.geometry.dispose(); }
+  return raiz;
+}
+
 function makeFactory() {
   const g = new THREE.Group(), w = 11, d = 8, H = 6, base = 0.4;
   g.add(mesh(rbox(w + 0.6, base, d + 0.6, 0.12), mat(0x7d8597, { roughness: 0.95 }), 0, base / 2, 0));
@@ -1042,10 +1094,11 @@ function criarModelo(tipo, p) {
     if (p && p.obra && p.obra.tipo === 'melhorar') { const a = makeAndaime(TIPOS[tipo].tam * T * 0.95, (o.userData.altura || 6) - 0.5); o.add(a); }
   }
   o.traverse(m => { if (m.isMesh) { m.castShadow = !m.userData.noShadow; m.receiveShadow = true; } });
-  return o;
+  return otimizar(o);
 }
 const chaveModelo = (p) => `${p.tipo}|${p.nv || 1}|${JSON.stringify(p.itens || {})}|${p.obra && p.obra.tipo !== 'enfeite' ? p.obra.tipo : ''}`;
 
+const MAX_ELFOS = 30;
 function makeElf(color = 0x2e9e5b) {
   const g = new THREE.Group();
   const skin = mat(0xf3c29b, { roughness: 0.6 }), green = mat(color, { roughness: 0.7 }), white = mat(0xf8f8f8, { roughness: 0.9 }), red = mat(0xd8333a, { roughness: 0.6 });
@@ -1064,7 +1117,8 @@ function makeElf(color = 0x2e9e5b) {
   hat.add(mesh(new THREE.SphereGeometry(0.1, 10, 8), white, 0, 0.8, 0));
   g.userData = { arms, legs, hat };
   g.scale.setScalar(0.85);
-  return shadowAll(g);
+  shadowAll(g);
+  return otimizar(g);
 }
 // Duende construtor: capacete amarelo e martelo.
 function makeConstrutor() {
@@ -1413,10 +1467,13 @@ export async function criarCena(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(devicePixelRatio, coarse ? 1.5 : 2));
   renderer.setSize(innerWidth, innerHeight);
+  renderer.info.autoReset = false; // conta os desenhos do quadro inteiro (bloom tem várias passadas)
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  // no celular a sombra é refeita a cada 2 quadros (quase metade dos desenhos é dela)
+  renderer.shadowMap.autoUpdate = false; let quadroSombra = 0;
 
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x1d3270, 0.0068);
@@ -1811,8 +1868,13 @@ export async function criarCena(canvas) {
     chimneys = [];
     for (const e of predios.values()) for (const s of e.obj.userData.smoke || []) chimneys.push(e.obj.localToWorld(s.clone()));
     // duendes
-    const vivosD = new Set();
-    vila.duendes.forEach((d, i) => {
+    // na tela vão no máximo MAX_ELFOS (cada um tem ~16 peças): primeiro um por prédio,
+    // depois os outros. Os demais continuam trabalhando, só não aparecem.
+    const vivosD = new Set(), vistos = new Set(), lista = [];
+    for (const d of vila.duendes) if (d.predio && !vistos.has(d.predio)) { vistos.add(d.predio); lista.push(d); }
+    for (const d of vila.duendes) if (!lista.includes(d)) lista.push(d);
+    lista.slice(0, MAX_ELFOS).forEach((d) => {
+      const i = vila.duendes.indexOf(d);
       vivosD.add(d.id);
       if (!elfs.has(d.id)) {
         const obj = makeElf(ELF_CORES[i % ELF_CORES.length]);
@@ -2051,7 +2113,8 @@ export async function criarCena(canvas) {
     }
     for (const e of predios.values()) if (e.obj.userData.guindaste) e.obj.userData.guindaste.rotation.y = Math.sin(t * 0.4) * 0.6;
     for (const fn of ouvintes) fn(dt);
-    composer.render();
+    if (quadroSombra++ % (coarse ? 2 : 1) === 0) renderer.shadowMap.needsUpdate = true;
+    renderer.info.reset(); composer.render();
     requestAnimationFrame(frame);
   }
 
@@ -2198,7 +2261,8 @@ export async function criarCena(canvas) {
     aoQuadro: fn => ouvintes.push(fn),
     papaiNoel, chamineDe, noelVoando: () => noel.voando,
     qualidade: () => qualidade, setQualidade: aplicarQualidade, neve: () => neve,
-    memoria: () => ({ ...renderer.info.memory }),
+    pecas: () => { const r = {}; for (const e of predios.values()) { let m = 0, t = 0; e.obj.traverse(o => { if (o.isMesh) { m++; const g = o.geometry; t += (g.index ? g.index.count : g.attributes.position.count) / 3 * (o.isInstancedMesh ? o.count : 1); } }); const x = r[e.tipo] || (r[e.tipo] = { n: 0, pecas: 0, tri: 0 }); x.n++; x.pecas += m; x.tri += Math.round(t); } let ce = 0; scene.traverse(o => { if (o.isMesh) ce++; }); r._cenaToda = ce; return r; },
+    memoria: () => ({ ...renderer.info.memory, desenhos: renderer.info.render.calls, triangulos: renderer.info.render.triangles }),
     controls,
   };
 }

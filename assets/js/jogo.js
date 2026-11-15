@@ -958,6 +958,6 @@ async function iniciar() {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') enviar(); });
 }
 // atalho pros testes automáticos (só no servidor local)
-if (location.hostname === 'localhost') window.__teste = { selecionarTipo: (t) => selecionar(estado.predios.find(p => p.tipo === t).id), memoria: () => cena.memoria(), noel: () => { const c = estado.predios.find(p => p.tipo === 'casa'); cena.papaiNoel([{ id: c.id, pos: cena.chamineDe(c.id) }], (id) => coletar(id), { perto: true }); }, focar: (t) => cena.focar(estado.predios.find(p => p.tipo === t).id), agir: (a) => agir(a), estado: () => estado };
+if (location.hostname === 'localhost') window.__teste = { selecionarTipo: (t) => selecionar(estado.predios.find(p => p.tipo === t).id), memoria: () => cena.memoria(), pecas: () => cena.pecas(), noel: () => { const c = estado.predios.find(p => p.tipo === 'casa'); cena.papaiNoel([{ id: c.id, pos: cena.chamineDe(c.id) }], (id) => coletar(id), { perto: true }); }, focar: (t) => cena.focar(estado.predios.find(p => p.tipo === t).id), agir: (a) => agir(a), estado: () => estado, cena: () => cena };
 
 iniciar();
