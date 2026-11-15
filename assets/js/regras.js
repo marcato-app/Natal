@@ -6,13 +6,16 @@
 // em ms) e os ids saem do contador da própria vila (`seq`).
 
 export const VERSAO = 1;
-export const TAMANHO = 18;          // a vila é uma grade de 18 x 18 lotes
+export const TAMANHO = 18;          // a vila começa com uma grade de 18 x 18 lotes (0..17)
+export const EXPANSAO = 6;          // terrenos à venda: blocos de 6 x 6 em volta dela
+export const MAPA_MIN = -EXPANSAO, MAPA_MAX = TAMANHO + EXPANSAO;   // mapa completo: -6..23
 export const ESTOQUE_MAX = 4;       // quantos ciclos de produção um prédio guarda
 export const MAX_ACOES = 50;        // por requisição
 
-// Ruas fixas do mapa (em lotes). Não dá pra construir em cima.
+// Ruas fixas do mapa (em lotes). Não dá pra construir em cima. A rua principal
+// atravessa também os terrenos de expansão.
 export const RUAS = [
-  { x: 0, z: 10, w: 18, h: 1 },
+  { x: MAPA_MIN, z: 10, w: MAPA_MAX - MAPA_MIN, h: 1 },
   { x: 9, z: 11, w: 1, h: 7 },
 ];
 
@@ -156,6 +159,24 @@ export const ITENS = {
   },
 };
 
+// Terrenos de expansão: os 16 blocos em volta da vila. Os do lado da rua são os
+// primeiros (mais baratos); fundos e frente depois; cantos por último.
+export const TERRENOS = (() => {
+  const lista = [];
+  for (const bx of [-6, 0, 6, 12, 18]) for (const bz of [-6, 0, 6, 12, 18]) {
+    const dentro = bx >= 0 && bx < TAMANHO && bz >= 0 && bz < TAMANHO;
+    if (dentro) continue;
+    const canto = (bx < 0 || bx >= TAMANHO) && (bz < 0 || bz >= TAMANHO);
+    const ladoRua = !canto && (bx < 0 || bx >= TAMANHO) && bz === 6;
+    const custo = canto ? { moedas: 2500, estrelas: 20 } : ladoRua ? { moedas: 800 } : (bx < 0 || bx >= TAMANHO) ? { moedas: 1200 } : { moedas: 1500 };
+    const nivel = canto ? 5 : ladoRua ? 2 : 3;
+    lista.push({ id: `t${bx}_${bz}`, x: bx, z: bz, w: EXPANSAO, h: EXPANSAO, custo, nivel });
+  }
+  return lista;
+})();
+export const terreno = (id) => TERRENOS.find(t => t.id === id) || null;
+export function terrenoLivre(v, t) { return !(v.terrenos || []).includes(t.id); }
+
 export const CATEGORIAS = [
   { id: 'casas', nome: 'Casas' },
   { id: 'producao', nome: 'Produção' },
@@ -243,11 +264,18 @@ export function ehRua(x, z) {
   return RUAS.some(r => x >= r.x && x < r.x + r.w && z >= r.z && z < r.z + r.h);
 }
 
+// O lote (x,z) é da vila? (área inicial ou terreno comprado)
+export function naVila(v, x, z) {
+  if (x >= 0 && z >= 0 && x < TAMANHO && z < TAMANHO) return true;
+  const meus = v.terrenos || [];
+  return TERRENOS.some(t => meus.includes(t.id) && x >= t.x && x < t.x + t.w && z >= t.z && z < t.z + t.h);
+}
+
 // O lote (x,z) com tamanho tam cabe? ignorar = id de prédio que não conta (ao mover).
 export function cabe(v, x, z, tam, ignorar = null) {
   if (!Number.isInteger(x) || !Number.isInteger(z)) return false;
-  if (x < 0 || z < 0 || x + tam > TAMANHO || z + tam > TAMANHO) return false;
-  for (let i = x; i < x + tam; i++) for (let j = z; j < z + tam; j++) if (ehRua(i, j)) return false;
+  if (x < MAPA_MIN || z < MAPA_MIN || x + tam > MAPA_MAX || z + tam > MAPA_MAX) return false;
+  for (let i = x; i < x + tam; i++) for (let j = z; j < z + tam; j++) if (ehRua(i, j) || !naVila(v, i, j)) return false;
   for (const p of v.predios) {
     if (p.id === ignorar) continue;
     const t = TIPOS[p.tipo].tam;
@@ -521,6 +549,18 @@ export function aplicar(v, a, agora) {
       } else return erro('Prêmio desconhecido');
       v.anuncios = { dia: diaDe(agora), n: anunciosHoje(v, agora) + 1 };
       return { ok: true, ganho };
+    }
+
+    case 'terreno': {
+      const t = terreno(a.id);
+      if (!t) return erro('Terreno desconhecido');
+      if (!terrenoLivre(v, t)) return erro('Esse terreno já é seu');
+      if (nivelDe(v.alegria) < t.nivel) return erro(`Libera no nível ${t.nivel}`);
+      if (!podePagar(v, t.custo)) return erro('Recursos insuficientes');
+      pagar(v, t.custo);
+      v.terrenos = [...(v.terrenos || []), t.id];
+      ganharAlegria(v, 10);
+      return { ok: true, ganho: { alegria: 10 } };
     }
 
     case 'acelerar': {

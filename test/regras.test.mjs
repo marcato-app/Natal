@@ -3,7 +3,7 @@
 //   node test/regras.test.mjs
 
 import {
-  ANUNCIOS_POR_DIA, ANUNCIO_ADIANTA, anunciosHoje, presenteDeHoje, missoesAtivas, MISSOES, ADVENTO, ganharAlegria, ITENS, bloqueioItem, aluguelDe, TEMPO_ENFEITE, ALUGUEL_CICLO, novaVila, aplicar, avancar, cabe, moradia, prontos, nivelDe, TIPOS, ESTOQUE_MAX, CUSTO_DUENDE,
+  TERRENOS, naVila, ANUNCIOS_POR_DIA, ANUNCIO_ADIANTA, anunciosHoje, presenteDeHoje, missoesAtivas, MISSOES, ADVENTO, ganharAlegria, ITENS, bloqueioItem, aluguelDe, TEMPO_ENFEITE, ALUGUEL_CICLO, novaVila, aplicar, avancar, cabe, moradia, prontos, nivelDe, TIPOS, ESTOQUE_MAX, CUSTO_DUENDE,
 } from '../assets/js/regras.js';
 
 let pass = 0, fail = 0;
@@ -262,6 +262,22 @@ const fab = (v) => v.predios.find(p => p.tipo === 'fabrica');
   while (anunciosHoje(v, T0) < ANUNCIOS_POR_DIA) aplicar(v, { tipo: 'anuncio', premio: 'estrelas' }, T0);
   check('limite de vídeos por dia', aplicar(v, { tipo: 'anuncio', premio: 'estrelas' }, T0).erro.includes('amanhã'));
   check('no dia seguinte libera de novo', aplicar(v, { tipo: 'anuncio', premio: 'estrelas' }, T0 + 86400000).ok);
+}
+
+// expansão do mapa
+{
+  const v = novaVila(T0); v.moedas = 9999; v.estrelas = 999;
+  check('16 terrenos em volta da vila', TERRENOS.length === 16);
+  check('fora da vila não constrói', !aplicar(v, { tipo: 'construir', predio: 'pinheiro', x: -3, z: 3 }, T0).ok);
+  check('terreno pede nível', aplicar(v, { tipo: 'terreno', id: 't-6_6' }, T0).erro.includes('nível'));
+  v.alegria = 30;
+  const m0 = v.moedas;
+  check('compra o terreno do lado da rua', aplicar(v, { tipo: 'terreno', id: 't-6_6' }, T0).ok && m0 - v.moedas === 800);
+  check('não compra duas vezes', aplicar(v, { tipo: 'terreno', id: 't-6_6' }, T0).erro.includes('já é seu'));
+  check('lote do terreno comprado é da vila', naVila(v, -3, 7) && !naVila(v, -3, 3));
+  check('agora constrói no terreno novo', aplicar(v, { tipo: 'construir', predio: 'pinheiro', x: -3, z: 7 }, T0).ok);
+  check('a rua atravessa o terreno novo', !aplicar(v, { tipo: 'construir', predio: 'pinheiro', x: -3, z: 10 }, T0).ok);
+  check('prédio que passa da borda do terreno comprado não cabe', !aplicar(v, { tipo: 'construir', predio: 'casa', x: -2, z: 4 }, T0).ok);
 }
 
 check('ação desconhecida falha', !aplicar(novaVila(T0), { tipo: 'hackear' }, T0).ok);

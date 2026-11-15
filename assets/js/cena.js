@@ -10,7 +10,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { TAMANHO, RUAS, TIPOS, ITENS } from './regras.js';
+import { TAMANHO, RUAS, TIPOS, ITENS, MAPA_MIN, MAPA_MAX, TERRENOS } from './regras.js';
 
 export const T = 2.5; // tamanho de um lote em unidades do mundo
 const MEIO = TAMANHO / 2;
@@ -908,12 +908,12 @@ export async function criarCena(canvas) {
   const treeLight = new THREE.PointLight(0xffc46b, 110, 26, 2); scene.add(treeLight);
 
   // terreno: plano no meio (a vila), morros em volta
-  const borda = MEIO * T;
+  const borda = (MAPA_MAX - MEIO) * T; // mapa completo, com os terrenos de expansão
   // a rua principal atravessa a vila e segue pela floresta; o trem passa lá no fundo
-  const RUA_Z = centroLote(0, RUAS[0].z, 1).z, TRILHO_Z = -42, TRILHO_Y = 0.4;
+  const RUA_Z = centroLote(0, RUAS[0].z, 1).z, TRILHO_Z = -(MAPA_MAX - MEIO) * T - 10, TRILHO_Y = 0.4;
   const hAt = (x, z) => {
     const d = Math.max(Math.abs(x), Math.abs(z)), S = THREE.MathUtils.smoothstep, dr = Math.hypot(x, z);
-    const hill = S(dr, 40, 105) * 20 * (0.7 + 0.3 * Math.sin(x * 0.05 + z * 0.04));
+    const hill = S(dr, borda * 1.45, borda * 1.45 + 80) * 20 * (0.7 + 0.3 * Math.sin(x * 0.05 + z * 0.04));
     const n = Math.sin(x * 0.08) * Math.cos(z * 0.07) * 1.8 + Math.sin(x * 0.21 + z * 0.17) * 0.6;
     let h = hill + S(d, borda + 6, borda + 30) * n + S(d, borda + 1, borda + 6) * Math.sin(x * 0.35) * Math.sin(z * 0.3) * 0.25;
     h *= S(Math.abs(z - RUA_Z), 3, 8);
@@ -938,7 +938,7 @@ export async function criarCena(canvas) {
     const w = r.w * T, h = r.h * T, c = centroLote(r.x, r.z, 1).add(V3((r.w - 1) * T / 2, 0, (r.h - 1) * T / 2));
     const alongX = r.w >= r.h, wid = (alongX ? h : w) * 0.82;
     let len = alongX ? w : h;
-    if (r.w === TAMANHO) { len = 320; c.x = 0; }
+    if (r === RUAS[0]) { len = 320; c.x = 0; }
     const m = new THREE.Mesh(new THREE.PlaneGeometry(wid, len), new THREE.MeshStandardMaterial({ map: rep(roadTex, 1, len / 6), roughness: 0.95 }));
     m.rotation.x = -Math.PI / 2; if (alongX) m.rotation.z = Math.PI / 2; m.position.set(c.x, 0.03, c.z); m.receiveShadow = true; scene.add(m);
   }
@@ -960,7 +960,7 @@ export async function criarCena(canvas) {
   {
     const pts = [];
     while (pts.length < (coarse ? 380 : 620)) {
-      const a = R(0, Math.PI * 2), d = R(borda + 6, 125), x = Math.cos(a) * d, z = Math.sin(a) * d;
+      const a = R(0, Math.PI * 2), d = R(borda + 6, 150), x = Math.cos(a) * d, z = Math.sin(a) * d;
       if (Math.max(Math.abs(x), Math.abs(z)) < borda + 5) continue;
       if (Math.abs(z - RUA_Z) < 6.5 || (z > TRILHO_Z - 7.5 && z < -borda - 3)) continue;
       if (z > borda && Math.abs(x) < 6 && d < 55) continue;
@@ -1061,7 +1061,7 @@ export async function criarCena(canvas) {
   const gradeGroup = new THREE.Group(); gradeGroup.visible = false; scene.add(gradeGroup);
   {
     const lines = [], y = 0.1;
-    for (let i = 0; i <= TAMANHO; i++) { const p = (i - MEIO) * T; lines.push(p, y, -borda, p, y, borda, -borda, y, p, borda, y, p); }
+    for (let i = 0; i <= MAPA_MAX - MAPA_MIN; i++) { const p = (MAPA_MIN + i - MEIO) * T; lines.push(p, y, -borda, p, y, borda, -borda, y, p, borda, y, p); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3));
     gradeGroup.add(new THREE.LineSegments(g, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22 })));
   }
@@ -1153,6 +1153,26 @@ export async function criarCena(canvas) {
 
   // ---------- estado desenhado ----------
   const predios = new Map();    // id -> { obj, tipo, tam }
+  // terrenos à venda: área amarela tracejada com placa; somem quando comprados
+  const terrenosGrupo = new THREE.Group(); scene.add(terrenosGrupo);
+  const loteVenda = new THREE.MeshBasicMaterial({ color: 0xffc94d, transparent: true, opacity: 0.16, depthWrite: false, toneMapped: false });
+  const bordaVenda = new THREE.LineDashedMaterial({ color: 0xffd76a, dashSize: 0.9, gapSize: 0.6, toneMapped: false });
+  let chaveTerrenos = null;
+  function sincTerrenos(vila) {
+    const meus = vila.terrenos || [], chave = meus.join(',');
+    if (chave === chaveTerrenos) return;
+    chaveTerrenos = chave;
+    for (const o of [...terrenosGrupo.children]) { terrenosGrupo.remove(o); if (o.geometry && o.geometry !== placaGeo) o.geometry.dispose(); }
+    for (const t of TERRENOS) {
+      if (meus.includes(t.id)) continue;
+      const c = centroLote(t.x, t.z, t.w), L = t.w * T - 0.4;
+      const pl = new THREE.Mesh(new THREE.PlaneGeometry(L, L), loteVenda); pl.rotation.x = -Math.PI / 2; pl.position.set(c.x, 0.06, c.z); terrenosGrupo.add(pl);
+      const bd = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.PlaneGeometry(L, L)), bordaVenda); bd.computeLineDistances(); bd.rotation.x = -Math.PI / 2; bd.position.set(c.x, 0.09, c.z); terrenosGrupo.add(bd);
+      const poste = new THREE.Mesh(placaGeo, placaMat); poste.position.set(c.x - L / 2 + 1.5, 1.2, c.z + L / 2 - 1.5); poste.castShadow = true; terrenosGrupo.add(poste);
+    }
+  }
+  const placaGeo = new THREE.BoxGeometry(1.6, 1.0, 0.12), placaMat = mat(0xf4efe4);
+  function centroTerreno(id) { const t = TERRENOS.find(x => x.id === id); if (!t) return null; const c = centroLote(t.x, t.z, t.w); return c.add(V3(0, 1.5, 0)); }
   const construtoresObj = [];
   const elfs = new Map();       // duende id -> { obj, alvo, ... }
   const raiz = new THREE.Group(); scene.add(raiz);
@@ -1166,6 +1186,7 @@ export async function criarCena(canvas) {
 
   function sincronizar(vila) {
     vilaAtual = vila;
+    sincTerrenos(vila);
     const vivos = new Set();
     for (const p of vila.predios) {
       vivos.add(p.id);
@@ -1550,7 +1571,7 @@ export async function criarCena(canvas) {
   requestAnimationFrame(frame);
 
   return {
-    sincronizar, setFantasma, setDeslocamento, entrarCasa, sairCasa, sincSala, itemEm, posItem, modo: () => modo, setGrade, setSelecionado, esconder, loteEm, predioEm, projetar, topoDe, focar, miniaturas,
+    sincronizar, setFantasma, setDeslocamento, centroTerreno, entrarCasa, sairCasa, sincSala, itemEm, posItem, modo: () => modo, setGrade, setSelecionado, esconder, loteEm, predioEm, projetar, topoDe, focar, miniaturas,
     aoQuadro: fn => ouvintes.push(fn),
     papaiNoel, chamineDe, noelVoando: () => noel.voando,
     qualidade: () => qualidade, setQualidade: aplicarQualidade,

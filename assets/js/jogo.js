@@ -7,6 +7,7 @@ import {
   novaVila, aplicar, avancar, cabe, predio, duendesEm, moradia, moradiaDe, prontos, podePagar,
   nivelItem, bloqueioItem, aluguelDe, ALUGUEL_CICLO, PRESENTE_DOCES,
   ANUNCIO_ESTRELAS, ANUNCIO_ADIANTA, ANUNCIOS_POR_DIA, anunciosHoje,
+  TERRENOS, MAPA_MIN, MAPA_MAX, terrenoLivre,
   presenteDeHoje, missoesAtivas, PRESENTE_DIARIO, ADVENTO, diaDe,
   emConstrucao, obrasDeConstrutor, construtores, custoAcelerar, TEMPO_ENFEITE, CUSTO_CONSTRUTOR, MAX_CONSTRUTORES, ESTRELAS_POR_NIVEL,
   nivelDe, progressoNivel, alegriaAoConstruir,
@@ -201,7 +202,7 @@ function desenhar() {
 function abrir(qual) {
   if (colocando || dentro || (visitando && qual)) return;
   painel = qual;
-  for (const p of ['construir', 'predio', 'duendes', 'amigos', 'missoes', 'presente', 'ajustes', 'boasvindas', 'loja']) $('sheet-' + p).hidden = p !== qual;
+  for (const p of ['construir', 'predio', 'duendes', 'amigos', 'missoes', 'presente', 'ajustes', 'boasvindas', 'loja', 'terreno']) $('sheet-' + p).hidden = p !== qual;
   $('nav').hidden = !!qual;
   if (qual !== 'predio') { selecionado = null; cena.setSelecionado(null); }
   if (qual === 'construir') { desenharAbas(); desenharCards(); }
@@ -210,6 +211,7 @@ function abrir(qual) {
   if (qual === 'presente') desenharPresente();
   if (qual === 'loja') desenharLoja();
   if (qual === 'amigos') abrirAmigos();
+  if (qual === 'terreno') desenharTerreno();
   if (qual === 'ajustes') { const pf = som.preferencias(); $('aj-musica').checked = pf.musica; $('aj-sons').checked = pf.sons; $('aj-qualidade').value = String(cena.qualidade()); }
   if (qual === 'predio') { vendaPendente = false; desenharPredio.chave = null; desenharPredio(); }
   deslocarCena();
@@ -450,6 +452,25 @@ $('aj-musica').addEventListener('change', (e) => { som.iniciar(); som.setMusica(
 $('aj-sons').addEventListener('change', (e) => som.setSons(e.target.checked));
 $('aj-qualidade').addEventListener('change', (e) => cena.setQualidade(Number(e.target.value)));
 $('bv-ok').addEventListener('click', () => { try { localStorage.setItem('natal.boasvindas', '1'); } catch { /* ok */ } som.iniciar(); fechar(); });
+
+// Terrenos (expansão do mapa)
+let terrenoAberto = null;
+function abrirTerreno(id) {
+  terrenoAberto = TERRENOS.find(t => t.id === id);
+  abrir('terreno');
+}
+function desenharTerreno() {
+  const t = terrenoAberto; if (!t) return;
+  const nv = nivelDe(estado.alegria);
+  $('tr-info').textContent = `Aumenta a vila em ${t.w} × ${t.h} lotes pra construir mais casas, padarias e decorações.`;
+  const btn = $('tr-comprar');
+  if (t.nivel > nv) { btn.disabled = true; btn.innerHTML = `${svg('i-cadeado')} Libera no nível ${t.nivel}`; }
+  else { btn.disabled = !podePagar(estado, t.custo); btn.innerHTML = `Comprar terreno · <span class="cost">${custoHtml(t.custo)}</span>`; }
+}
+$('tr-comprar').addEventListener('click', () => {
+  const r = agir({ tipo: 'terreno', id: terrenoAberto.id });
+  if (r.ok) { som.tocar('nivel'); toast('Terreno comprado! A vila cresceu.'); fechar(); }
+});
 
 // Amigos
 let eu = null, amigos = [], visitando = null;
@@ -739,6 +760,22 @@ function sincBaloes() {
     el.setAttribute('aria-label', rotulo);
     el.dataset.modo = modo;
   }
+  // terrenos à venda: mostra os que já dá pra comprar e os do próximo nível
+  const nv = nivelDe(estado.alegria);
+  for (const t of TERRENOS) {
+    if (!terrenoLivre(estado, t) || t.nivel > nv + 1) continue;
+    const id = 'T:' + t.id; vivos.add(id);
+    let el = baloes.get(id);
+    if (!el) {
+      el = document.createElement('button'); el.type = 'button';
+      el.addEventListener('click', () => { if (!colocando) abrirTerreno(t.id); });
+      $('baloes').appendChild(el); baloes.set(id, el);
+    }
+    const html = t.nivel > nv ? `${svg('i-cadeado')}Terreno · nível ${t.nivel}` : `${svg('i-moedas')}Terreno · ${fmt(t.custo.moedas)}`;
+    if (el.innerHTML !== html) el.innerHTML = html;
+    el.className = 'balao ' + (t.nivel > nv ? 'obra' : 'terreno');
+    el.setAttribute('aria-label', `Terreno à venda: ${fmt(t.custo.moedas)} moedas`);
+  }
   for (const [id, el] of baloes) if (!vivos.has(id)) { el.remove(); baloes.delete(id); }
 }
 function posicionarBaloes() {
@@ -749,7 +786,7 @@ function posicionarBaloes() {
   }
   for (const [id, el] of baloes) {
     if (dentro) { el.style.visibility = 'hidden'; continue; }
-    const top = cena.topoDe(id);
+    const top = id.startsWith('T:') ? cena.centroTerreno(id.slice(2)) : cena.topoDe(id);
     const s = top && cena.projetar(top);
     const esconder = !s || !s.visivel || (colocando && colocando.moverId === id);
     el.style.visibility = esconder ? 'hidden' : 'visible';
@@ -762,7 +799,7 @@ function posicionarBaloes() {
 function lugarLivre(tipo, perto) {
   const tam = TIPOS[tipo].tam;
   let melhor = null, md = Infinity;
-  for (let x = 0; x <= 18 - tam; x++) for (let z = 0; z <= 18 - tam; z++) {
+  for (let x = MAPA_MIN; x <= MAPA_MAX - tam; x++) for (let z = MAPA_MIN; z <= MAPA_MAX - tam; z++) {
     if (!cabe(estado, x, z, tam)) continue;
     const d = (x + tam / 2 - perto.x) ** 2 + (z + tam / 2 - perto.z) ** 2;
     if (d < md) { md = d; melhor = { x, z }; }
@@ -811,8 +848,8 @@ $('place-ok').addEventListener('click', () => {
 function moverFantasmaPara(cx, cy) {
   const l = cena.loteEm(cx, cy); if (!l) return;
   const tam = TIPOS[colocando.tipo].tam;
-  const x = Math.max(0, Math.min(18 - tam, Math.round(l.fx - tam / 2)));
-  const z = Math.max(0, Math.min(18 - tam, Math.round(l.fz - tam / 2)));
+  const x = Math.max(MAPA_MIN, Math.min(MAPA_MAX - tam, Math.round(l.fx - tam / 2)));
+  const z = Math.max(MAPA_MIN, Math.min(MAPA_MAX - tam, Math.round(l.fz - tam / 2)));
   if (x !== colocando.x || z !== colocando.z) { colocando.x = x; colocando.z = z; atualizarFantasma(); }
 }
 

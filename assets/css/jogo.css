@@ -121,6 +121,8 @@ svg { flex-shrink: 0; }
 button.pill { border: 1px solid var(--line); color: var(--snow); cursor: pointer; }
 .tempo { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 800; color: var(--muted); }
 .tempo svg { width: 12px; height: 12px; }
+.balao.terreno { background: var(--gold); }
+.balao.terreno::after { border-top-color: var(--gold); }
 .balao.obra { background: #2a3358; color: var(--snow); padding: 6px 10px; font-size: 13px; }
 .balao.obra::after { border-top-color: #2a3358; }
 .balao.obra svg { width: 16px; height: 16px; color: var(--gold); }
