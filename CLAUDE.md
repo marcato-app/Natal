@@ -147,6 +147,13 @@ anúncios precisam de internet.
 - **Pacotes de estrelas** aparecem na loja como "em breve": falta criar os produtos na
   App Store Connect / Google Play e validar o recibo no servidor antes de creditar.
 
+## Balanceamento
+
+`node scripts/simular.mjs [dias] [sessõesPorDia] [minutos]` joga no automático com as
+regras reais e mostra em que dia chega a cada nível (`--dias` imprime dia a dia). Meta
+atual: jogando 4×5 min por dia, nível 2 no 1º dia e nível 20 perto do dia 40 (Natal).
+Decoração repetida dá alegria decrescente (2ª metade, 3ª um terço...).
+
 ## Rodar local
 
 ```bash

@@ -149,7 +149,7 @@ const fab = (v) => v.predios.find(p => p.tipo === 'fabrica');
   check('casa começa no nível 1', casa.nv === 1 && moradia(v) === 4);
   check('cama precisa da casa nível 2', bloqueioItem(v, casa, 'cama').includes('nível 2'));
   check('melhorar precisa da vila no nível 2', aplicar(v, { tipo: 'melhorar', id: casa.id }, t).erro.includes('nível 2'));
-  v.alegria = 80; v.doces = 500;
+  v.alegria = 30;
   const r = aplicar(v, { tipo: 'melhorar', id: casa.id }, t);
   check('melhorar abre obra e a casa segue nível 1 até acabar', r.ok && casa.obra.tipo === 'melhorar' && casa.nv === 1 && moradia(v) === 4);
   check('durante a obra não decora', aplicar(v, { tipo: 'item', id: casa.id, item: 'guirlanda' }, t).erro.includes('obra'));
@@ -193,7 +193,7 @@ const fab = (v) => v.predios.find(p => p.tipo === 'fabrica');
   const a2 = nivelDe(v.alegria);
   aplicar(v, { tipo: 'coletar', id: fab(v).id }, T0 + 400_000);
   check('subir de nível dá estrelas', nivelDe(v.alegria) > a2 ? v.estrelas === 5 : true, { a: v.alegria, e: v.estrelas });
-  check('nível sobe e dá 5 estrelas', (ganhar => { const w = novaVila(T0); w.alegria = 29; w.estrelas = 0; ganhar(w); return w.estrelas === 5; })(w => aplicar(w, { tipo: 'construir', predio: 'pinheiro', x: 0, z: 0 }, T0)));
+  check('nível sobe e dá 5 estrelas', (ganhar => { const w = novaVila(T0); w.alegria = 44; w.estrelas = 0; ganhar(w); return w.estrelas === 5; })(w => aplicar(w, { tipo: 'construir', predio: 'pinheiro', x: 0, z: 0 }, T0)));
 }
 
 // aluguel: casa enfeitada rende, o Papai Noel recolhe

@@ -26,7 +26,7 @@ export const RUAS = [
 ];
 
 // Alegria acumulada necessária pra cada nível: índice 0 = nível 1.
-export const NIVEIS = [0, 30, 80, 160, 280, 450, 700, 1000, 1400, 1900, 2500, 3200, 4000, 5000, 6200, 7600, 9200, 11000, 13000, 15500];
+export const NIVEIS = [0, 20, 40, 80, 160, 290, 470, 720, 1050, 1500, 2150, 3100, 4400, 6100, 8400, 11500, 15500, 20500, 27000, 35000];
 
 export const CUSTO_DUENDE = { doces: 40 };
 
@@ -144,21 +144,21 @@ export const TIPOS = {
   },
   padaria: { nome: 'Padaria de Biscoitos', cat: 'producao', tam: 3, custo: { moedas: 250 }, nivel: 1, tempo: 120, prod: { recurso: 'doces', qtd: 15, ciclo: 90, vagas: 2 } },
   fabrica: { nome: 'Fábrica de Brinquedos', cat: 'producao', tam: 4, custo: { moedas: 400 }, nivel: 2, tempo: 300, prod: { recurso: 'moedas', qtd: 40, ciclo: 60, vagas: 3 } },
-  rinque: { nome: 'Rinque de Patinação', cat: 'diversao', tam: 4, custo: { moedas: 600, doces: 50 }, nivel: 3, tempo: 600, prod: { recurso: 'alegria', qtd: 12, ciclo: 120, vagas: 2 } },
+  rinque: { nome: 'Rinque de Patinação', cat: 'diversao', tam: 4, custo: { moedas: 600, doces: 50 }, nivel: 3, tempo: 600, prod: { recurso: 'alegria', qtd: 8, ciclo: 120, vagas: 2 } },
   // ---- liberados do nível 4 ao 20 ----
-  correio: { nome: 'Correio do Papai Noel', cat: 'diversao', tam: 3, custo: { moedas: 800, doces: 40 }, nivel: 4, tempo: 900, prod: { recurso: 'alegria', qtd: 10, ciclo: 180, vagas: 1 } },
+  correio: { nome: 'Correio do Papai Noel', cat: 'diversao', tam: 3, custo: { moedas: 800, doces: 40 }, nivel: 4, tempo: 900, prod: { recurso: 'alegria', qtd: 6, ciclo: 180, vagas: 1 } },
   confeitaria: { nome: 'Confeitaria de Chocolate', cat: 'producao', tam: 3, custo: { moedas: 1100 }, nivel: 5, tempo: 1200, prod: { recurso: 'doces', qtd: 40, ciclo: 240, vagas: 2 } },
   loja: { nome: 'Loja de Brinquedos', cat: 'producao', tam: 3, custo: { moedas: 1500, doces: 60 }, nivel: 6, tempo: 1500, prod: { recurso: 'moedas', qtd: 110, ciclo: 240, vagas: 2 } },
   estacao: { nome: 'Estação de Trem', cat: 'producao', tam: 4, custo: { moedas: 2200, doces: 100 }, nivel: 7, tempo: 1800, prod: { recurso: 'moedas', qtd: 260, ciclo: 600, vagas: 3 } },
-  mercado: { nome: 'Mercado de Natal', cat: 'diversao', tam: 4, custo: { moedas: 2600, doces: 120 }, nivel: 8, tempo: 2100, prod: { recurso: 'alegria', qtd: 24, ciclo: 300, vagas: 2 } },
+  mercado: { nome: 'Mercado de Natal', cat: 'diversao', tam: 4, custo: { moedas: 2600, doces: 120 }, nivel: 8, tempo: 2100, prod: { recurso: 'alegria', qtd: 12, ciclo: 300, vagas: 2 } },
   renas: { nome: 'Renas de Luz', cat: 'decoracao', tam: 2, custo: { moedas: 400, doces: 30 }, nivel: 9, alegria: 25 },
-  pista: { nome: 'Pista de Trenó', cat: 'diversao', tam: 4, custo: { moedas: 3500, doces: 150 }, nivel: 10, tempo: 2700, prod: { recurso: 'alegria', qtd: 36, ciclo: 480, vagas: 2 } },
+  pista: { nome: 'Pista de Trenó', cat: 'diversao', tam: 4, custo: { moedas: 3500, doces: 150 }, nivel: 10, tempo: 2700, prod: { recurso: 'alegria', qtd: 16, ciclo: 480, vagas: 2 } },
   presepio: { nome: 'Presépio', cat: 'decoracao', tam: 2, custo: { moedas: 700, doces: 50 }, nivel: 11, alegria: 40 },
-  roda: { nome: 'Roda-Gigante', cat: 'diversao', tam: 4, custo: { moedas: 5000, doces: 200 }, nivel: 12, tempo: 3600, prod: { recurso: 'alegria', qtd: 55, ciclo: 600, vagas: 3 } },
+  roda: { nome: 'Roda-Gigante', cat: 'diversao', tam: 4, custo: { moedas: 5000, doces: 200 }, nivel: 12, tempo: 3600, prod: { recurso: 'alegria', qtd: 22, ciclo: 600, vagas: 3 } },
   chafariz: { nome: 'Chafariz Congelado', cat: 'decoracao', tam: 2, custo: { moedas: 1100, doces: 80 }, nivel: 13, alegria: 60 },
-  teatro: { nome: 'Teatro de Natal', cat: 'diversao', tam: 4, custo: { moedas: 7000, doces: 260 }, nivel: 14, tempo: 4500, prod: { recurso: 'alegria', qtd: 80, ciclo: 900, vagas: 3 } },
+  teatro: { nome: 'Teatro de Natal', cat: 'diversao', tam: 4, custo: { moedas: 7000, doces: 260 }, nivel: 14, tempo: 4500, prod: { recurso: 'alegria', qtd: 30, ciclo: 900, vagas: 3 } },
   arvoreGigante: { nome: 'Árvore Gigante', cat: 'decoracao', tam: 2, custo: { moedas: 1800, doces: 120 }, nivel: 15, alegria: 95 },
-  castelo: { nome: 'Castelo de Gelo', cat: 'diversao', tam: 4, custo: { moedas: 9500, doces: 350 }, nivel: 16, tempo: 5400, prod: { recurso: 'alegria', qtd: 120, ciclo: 1200, vagas: 3 } },
+  castelo: { nome: 'Castelo de Gelo', cat: 'diversao', tam: 4, custo: { moedas: 9500, doces: 350 }, nivel: 16, tempo: 5400, prod: { recurso: 'alegria', qtd: 40, ciclo: 1200, vagas: 3 } },
   arco: { nome: 'Arco de Luzes', cat: 'decoracao', tam: 2, custo: { moedas: 2600, doces: 150 }, nivel: 17, alegria: 140 },
   pousada: { nome: 'Pousada da Neve', cat: 'casas', tam: 4, custo: { moedas: 6000, doces: 250 }, nivel: 18, tempo: 3600, moradia: 10 },
   estatua: { nome: 'Estátua do Papai Noel', cat: 'decoracao', tam: 2, custo: { moedas: 4000, doces: 220 }, nivel: 19, alegria: 200 },
@@ -451,7 +451,9 @@ export function aplicar(v, a, agora) {
       if (t.melhorias) p.nv = 1;
       v.predios.push(p);
       if (t.tempo) { p.obra = { tipo: 'construir', fim: agora + t.tempo * 1000 }; return { ok: true, id: p.id, obra: p.obra }; }
-      const ganho = alegriaAoConstruir(a.predio);
+      // decoração repetida vale menos (a 2ª dá metade, a 3ª um terço...): incentiva variar
+      const iguais = v.predios.filter(x => x.tipo === a.predio).length - 1;
+      const ganho = Math.max(1, Math.floor(alegriaAoConstruir(a.predio) / (1 + iguais)));
       ganharAlegria(v, ganho);
       return { ok: true, id: p.id, ganho: { alegria: ganho } };
     }
