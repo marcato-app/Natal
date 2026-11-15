@@ -223,6 +223,7 @@ function deslocarCena() {
   const aberto = painel === 'predio' || painel === 'construir' || !!dentro;
   if (!aberto) cena.setDeslocamento(0, 0);
   else if (innerWidth >= 900) cena.setDeslocamento(220, 0);
+  else if (innerWidth > innerHeight) cena.setDeslocamento(Math.round(innerWidth * 0.22), 0); // deitado: painel na direita
   else cena.setDeslocamento(0, Math.round(innerHeight * (dentro ? 0.07 : 0.13)));
 }
 addEventListener('resize', () => cena && deslocarCena());
