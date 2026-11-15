@@ -467,22 +467,36 @@ function posicoesEm(raiz, m) {
 const LUZ_JANELA = new THREE.MeshStandardMaterial({ color: 0x2b2116, emissive: 0xffb45e, emissiveIntensity: 0.85, roughness: 0.25, metalness: 0.2 });
 LUZ_JANELA.userData.compartilhado = true;
 
-function prepararCasa3(cena) {
+// opcoes.chamineDoModelo: a casa já tem chaminé (o ponto mais alto fora do telhado).
+function prepararCasa(cena, opcoes = {}) {
   const raiz = new THREE.Group(); raiz.add(cena); raiz.updateMatrixWorld(true);
+  // frente = lado por onde a calçada (concreto) sai da casa; gira pra ela ficar em +z
+  const semConcreto = new THREE.Box3(), tudo = new THREE.Box3().setFromObject(cena);
+  cena.traverse(o => { if (o.isMesh && !/concrete/i.test(o.material.name)) semConcreto.expandByObject(o); });
+  // a porta colorida (material "Accent") é a melhor pista; a calçada só quando não há
+  const corPorta = new THREE.Box3(); cena.traverse(o => { if (o.isMesh && /accent/i.test(o.material.name)) corPorta.expandByObject(o); });
+  let lados;
+  if (!corPorta.isEmpty() && opcoes.frente !== 'calcada') {
+    const pc = corPorta.getCenter(V3()), d = pc.sub(semConcreto.getCenter(V3())), sx = semConcreto.getSize(V3());
+    const fx = d.x / sx.x, fz = d.z / sx.z; // quanto a porta está perto de cada parede
+    lados = [[fz, 0], [-fz, Math.PI], [fx, -Math.PI / 2], [-fx, Math.PI / 2]].sort((a, b) => b[0] - a[0]);
+  } else lados = [[tudo.max.z - semConcreto.max.z, 0], [semConcreto.min.z - tudo.min.z, Math.PI], [tudo.max.x - semConcreto.max.x, -Math.PI / 2], [semConcreto.min.x - tudo.min.x, Math.PI / 2]].sort((a, b) => b[0] - a[0]);
+  if (lados[0][0] > 0.1) cena.rotation.y = lados[0][1];
+  raiz.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(cena), c = box.getCenter(new THREE.Vector3());
   cena.position.set(-c.x, -box.min.y, -c.z); raiz.updateMatrixWorld(true);
   const tam = box.getSize(new THREE.Vector3());
-  let telhado = null; const vidros = [];
+  const telhados = [], vidros = [], outras = [];
   cena.traverse(o => {
     if (!o.isMesh) return;
     o.geometry.userData.compartilhado = true;
     const m = o.material; m.userData.compartilhado = true;
     for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) if (m[k]) m[k].userData.compartilhado = true;
     if (/vidro/i.test(m.name)) { o.material = LUZ_JANELA; vidros.push(o); }
-    if (/roof/i.test(m.name)) telhado = o;
+    else if (/roof|asphalt/i.test(m.name)) telhados.push(o); else outras.push(o);
   });
   // neve: os triângulos do telhado virados pra cima, levantados um pouco
-  const tri = telhado ? posicoesEm(raiz, telhado) : [];
+  const tri = telhados.flatMap(t => posicoesEm(raiz, t));
   const neve = [], a = new THREE.Vector3(), b = new THREE.Vector3(), d = new THREE.Vector3(), nrm = new THREE.Vector3();
   for (let i = 0; i < tri.length; i += 9) {
     a.set(tri[i], tri[i + 1], tri[i + 2]); b.set(tri[i + 3], tri[i + 4], tri[i + 5]); d.set(tri[i + 6], tri[i + 7], tri[i + 8]);
@@ -493,9 +507,10 @@ function prepararCasa3(cena) {
   const neveGeo = new THREE.BufferGeometry(); neveGeo.setAttribute('position', new THREE.Float32BufferAttribute(neve, 3)); neveGeo.computeVertexNormals(); neveGeo.userData.compartilhado = true;
   // beirais: arestas de borda do telhado, horizontais, com o resto do triângulo acima
   const chave = (x, y, z) => `${Math.round(x * 50)},${Math.round(y * 50)},${Math.round(z * 50)}`;
+  // (só na face de cima do telhado: telhado com espessura é fechado e não tem borda solta)
   const arestas = new Map();
-  for (let i = 0; i < tri.length; i += 9) {
-    const vs = [0, 1, 2].map(k => [tri[i + k * 3], tri[i + k * 3 + 1], tri[i + k * 3 + 2]]);
+  for (let i = 0; i < neve.length; i += 9) {
+    const vs = [0, 1, 2].map(k => [neve[i + k * 3], neve[i + k * 3 + 1], neve[i + k * 3 + 2]]);
     for (let k = 0; k < 3; k++) {
       const p = vs[k], q = vs[(k + 1) % 3], r = vs[(k + 2) % 3];
       const kp = chave(...p), kq = chave(...q), ch = kp < kq ? kp + '|' + kq : kq + '|' + kp;
@@ -508,7 +523,7 @@ function prepararCasa3(cena) {
     const comp = Math.hypot(q[0] - p[0], q[2] - p[2]);
     if (comp < 0.4 || Math.abs(q[1] - p[1]) > 0.05 * comp) continue;
     if (r[1] < Math.max(p[1], q[1]) + 0.05) continue; // cumeeira, não beiral
-    beirais.push([new THREE.Vector3(...p), new THREE.Vector3(...q)]);
+    beirais.push([new THREE.Vector3(p[0], p[1] - 0.12, p[2]), new THREE.Vector3(q[0], q[1] - 0.12, q[2])]);
   }
   // janelas: grupos de vidro virados pra frente (+z); a porta é o mais baixo e alto
   const paineis = [];
@@ -528,9 +543,14 @@ function prepararCasa3(cena) {
   frente.sort((x, y) => x.box.min.y - y.box.min.y || (y.box.max.y - y.box.min.y) - (x.box.max.y - x.box.min.y));
   const porta = frente.length && frente[0].box.min.y < tam.y * 0.25 ? frente.shift() : null;
   // ponto alto do telhado pra chaminé (raio de cima pra baixo, um pouco atrás da cumeeira)
-  const ray = new THREE.Raycaster(), alvos = telhado ? [telhado] : [];
-  let chamine = null;
-  for (let x = -tam.x * 0.3; x <= tam.x * 0.1 && telhado; x += tam.x * 0.05) for (let z = -tam.z * 0.35; z <= 0; z += tam.z * 0.05) {
+  const ray = new THREE.Raycaster(), alvos = telhados;
+  let chamine = null, chamineTopo = null;
+  if (opcoes.chamineDoModelo) { // topo da chaminé que já vem no modelo
+    const pts = outras.flatMap(o => posicoesEm(raiz, o)), ys = []; for (let i = 1; i < pts.length; i += 3) ys.push(pts[i]);
+    const topo = Math.max(...ys), sel = []; for (let i = 0; i < pts.length; i += 3) if (pts[i + 1] > topo - 0.15) sel.push([pts[i], pts[i + 2]]);
+    if (sel.length) chamineTopo = V3(sel.reduce((a, q) => a + q[0], 0) / sel.length, topo, sel.reduce((a, q) => a + q[1], 0) / sel.length);
+  }
+  for (let x = -tam.x * 0.3; x <= tam.x * 0.1 && alvos.length && !chamineTopo; x += tam.x * 0.05) for (let z = -tam.z * 0.35; z <= 0; z += tam.z * 0.05) {
     ray.set(V3(x, 50, z).applyMatrix4(raiz.matrixWorld), V3(0, -1, 0)); const h = ray.intersectObjects(alvos, false)[0];
     if (h) { const y = raiz.worldToLocal(h.point.clone()).y; if (!chamine || y > chamine.y + 0.3) chamine = V3(x, y, z); }
   }
@@ -538,22 +558,32 @@ function prepararCasa3(cena) {
     chamine.z -= tam.z * 0.12; ray.set(V3(chamine.x, 50, chamine.z).applyMatrix4(raiz.matrixWorld), V3(0, -1, 0));
     const h = ray.intersectObjects(alvos, false)[0]; if (h) chamine.y = raiz.worldToLocal(h.point.clone()).y;
   }
-  return { cena, tam, neveGeo, beirais, janelas: frente.map(x => x.box), porta: porta && porta.box, chamine };
+  return { cena, tam, neveGeo, beirais, janelas: frente.map(x => x.box), porta: porta && porta.box, chamine, chamineTopo, garagem: !!opcoes.garagem };
 }
-carregarPronto('casa3', '/assets/modelos/casa3.glb', prepararCasa3);
+// casas prontas por nível (sorteadas pelo id do prédio)
+const CASAS_PRONTAS = { 1: ['casa1a', 'casa1b', 'casa1c'], 2: ['casa2a', 'casa2b'], 3: ['casa3'] };
+carregarPronto('casa3', '/assets/modelos/casa3.glb', (c) => prepararCasa(c, { garagem: true }));
+// (a Fleetwood tem uma ponta pintada da cor da porta: a frente dela sai pela calçada)
+for (const n of ['casa1a', 'casa1b', 'casa1c', 'casa2a', 'casa2b']) carregarPronto(n, `/assets/modelos/${n}.glb`, (c) => prepararCasa(c, { chamineDoModelo: true, frente: n === 'casa1c' ? 'calcada' : 'porta' }));
+function casaPronta(p) {
+  if (!p) return null;
+  const lista = CASAS_PRONTAS[Math.min(3, p.nv || 1)], nome = lista[hashId(p.id || 'vitrine') % lista.length];
+  return PRONTOS[nome] || null;
+}
 
-// Casa nível 3 com o modelo pronto ("American House", AleixoAlonso, CC BY 4.0) e os enfeites
-// de fachada do jogo presos no próprio modelo.
-function makeCasaPronta(p = {}) {
-  const P = PRONTOS.casa3, it = p.itens || {}, hv = hashId(p.id || 'vitrine');
-  const k = 7.4 / P.tam.x, espelho = (hv >> 3) % 2 ? -1 : 1;
+// Casa com modelo pronto (AleixoAlonso, Sketchfab, CC BY 4.0) e os enfeites de fachada do
+// jogo presos no próprio modelo.
+function makeCasaPronta(p, P) {
+  const it = p.itens || {}, hv = hashId(p.id || 'vitrine');
+  const k = Math.min(0.5, 7.4 / Math.max(P.tam.x, P.tam.z)), espelho = (hv >> 3) % 2 ? -1 : 1;
   const g = new THREE.Group(), casa = new THREE.Group(); g.add(casa);
   casa.scale.set(k * espelho, k, k); casa.position.z = -0.3;
   casa.add(P.cena.clone());
   const neve = new THREE.Mesh(P.neveGeo, snowMat); neve.userData.noShadow = true; casa.add(neve);
   const W = (v) => V3(v.x * k * espelho, v.y * k, v.z * k - 0.3); // modelo → prédio
   // chaminé de tijolo
-  if (P.chamine) {
+  if (P.chamineTopo) { const t = W(P.chamineTopo); g.userData.smoke = [V3(t.x, t.y + 0.1, t.z)]; }
+  else if (P.chamine) {
     const ch = W(P.chamine), alt = 1.25;
     g.add(caixa(0.45, alt, 0.45, tijolo, ch.x, ch.y + alt / 2 - 0.35, ch.z));
     g.add(caixa(0.58, 0.1, 0.58, MR.preto, ch.x, ch.y + alt - 0.3, ch.z));
@@ -578,7 +608,7 @@ function makeCasaPronta(p = {}) {
   // jardim: arbustos com neve na frente; nível 2 do jardim põe pinheiros, postes e o carro
   const frenteZ = P.tam.z / 2 * k - 0.3, portaX = P.porta ? W(P.porta.getCenter(V3())).x : 0;
   for (let x = -3.4; x <= 3.4; x += 0.6) {
-    if (Math.abs(x - portaX) < 0.9 || x * espelho > 0.6) continue; // não tampa a porta nem a garagem
+    if (Math.abs(x - portaX) < 0.9 || (P.garagem && x * espelho > 0.6)) continue; // não tampa a porta nem a garagem
     const b = arbustoR(0.26); b.position.set(x, 0.25, frenteZ + 0.35); g.add(b);
     const n = arbustoR(0.18, snowMat); n.scale.y = 0.35; n.position.set(x, 0.47, frenteZ + 0.35); g.add(n);
   }
@@ -586,7 +616,7 @@ function makeCasaPronta(p = {}) {
     for (const dx of [-0.9, 0.9]) { const pj = posteJardim(); pj.scale.setScalar(0.6); pj.position.set(portaX + dx, 0, frenteZ + 1.0); g.add(pj); }
     if (it.jardim >= 2) {
       for (const x of [-3.5 * espelho]) { const c = conePinheiro(0.45, 2.4); c.position.set(x, 0, frenteZ - 0.4); g.add(c); }
-      const car = carroEsportivo([0xc0182c, 0x1d3a6e, 0x202226, 0xe8e8ea][hv % 4]); car.scale.setScalar(0.3); car.position.set(1.9 * espelho, 0.03, frenteZ + 1.1); car.rotation.y = Math.PI / 2; g.add(car);
+      const car = carroEsportivo([0xc0182c, 0x1d3a6e, 0x202226, 0xe8e8ea][hv % 4]); car.scale.setScalar(0.3); car.position.set((P.garagem ? 1.9 : 3.0) * espelho, 0.03, frenteZ + 1.1); car.rotation.y = Math.PI / 2; g.add(car);
     }
   }
   addPool(g, portaX, frenteZ + 0.6, 2.5);
@@ -1281,7 +1311,7 @@ function makeCarReal(cor, comArvore, suv) {
 }
 
 export const MODELOS = {
-  praca: makePlaza, casa: (p) => (p && (p.nv || 1) >= 3 && PRONTOS.casa3 ? makeCasaPronta(p) : makeHouse(p)), fabrica: makeFactory, padaria: makePadariaReal, rinque: makeRinqueReal,
+  praca: makePlaza, casa: (p) => { const P = casaPronta(p); return P ? makeCasaPronta(p, P) : makeHouse(p); }, fabrica: makeFactory, padaria: makePadariaReal, rinque: makeRinqueReal,
   correio: makeCorreio, confeitaria: makeConfeitaria, loja: makeLoja, estacao: makeEstacao, mercado: makeMercado, renas: makeRenas,
   pista: makePista, presepio: makePresepio, igreja: makeIgreja, roda: makeRoda, chafariz: makeChafariz, teatro: makeTeatro, arvoreGigante: makeArvoreGigante,
   castelo: makeCastelo, arco: makeArco, pousada: makePousada, estatua: makeEstatua, oficina: makeOficina,
@@ -2472,6 +2502,7 @@ export async function criarCena(canvas) {
     aoQuadro: fn => ouvintes.push(fn),
     papaiNoel, chamineDe, noelVoando: () => noel.voando,
     qualidade: () => qualidade, setQualidade: escolherQualidade, neve: () => neve,
+    prontos: () => Object.fromEntries(Object.entries(PRONTOS).map(([k, v]) => [k, { beirais: v.beirais.length, frente: v.beirais.filter(([a, b]) => (a.z + b.z) / 2 > 0).length, janelas: v.janelas.length, porta: !!v.porta, chamine: !!(v.chamine || v.chamineTopo), tam: v.tam.toArray().map(x => +x.toFixed(1)) }])),
     pecas: () => { const r = {}; for (const e of predios.values()) { let m = 0, t = 0; e.obj.traverse(o => { if (o.isMesh) { m++; const g = o.geometry; t += (g.index ? g.index.count : g.attributes.position.count) / 3 * (o.isInstancedMesh ? o.count : 1); } }); const x = r[e.tipo] || (r[e.tipo] = { n: 0, pecas: 0, tri: 0 }); x.n++; x.pecas += m; x.tri += Math.round(t); } let ce = 0; scene.traverse(o => { if (o.isMesh) ce++; }); r._cenaToda = ce; return r; },
     memoria: () => ({ ...renderer.info.memory, desenhos: renderer.info.render.calls, triangulos: renderer.info.render.triangles }),
     controls,

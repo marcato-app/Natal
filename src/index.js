@@ -308,6 +308,11 @@ export default {
         return comCors(json({ error: 'Erro interno' }, { status: 500 }), origem);
       }
     }
+    // modelos 3D (.glb) ficam no R2: são grandes demais pro pacote do Worker
+    if (env.MODELOS && request.method === 'GET' && url.pathname.startsWith('/assets/modelos/')) {
+      const obj = await env.MODELOS.get(url.pathname.slice('/assets/modelos/'.length));
+      if (obj) return new Response(obj.body, { headers: { 'Content-Type': 'model/gltf-binary', 'Cache-Control': 'public, max-age=86400', ETag: obj.httpEtag } });
+    }
     return env.ASSETS.fetch(request);
   },
 };

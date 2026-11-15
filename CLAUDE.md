@@ -68,12 +68,18 @@ então nada vem de CDN; `sw.js` guarda tudo no aparelho pra abrir offline.
 - **20 níveis** (`NIVEIS`) com prédios novos até o castelo; a oficina produz estrelas.
 - **Modelos prontos (.glb)** em `assets/modelos/`, carregados por `carregarPronto()` em `cena.js`
   (GLTFLoader + meshopt, vendorizados em `assets/vendor/three/addons/`). Enquanto não chegam,
-  o prédio usa o modelo feito por código. Hoje: a casa nível 3 (`casa3.glb`, "American House" de
-  AleixoAlonso, Sketchfab, CC BY 4.0, crédito nos Ajustes). `prepararCasa3` acha sozinho no modelo
-  as janelas (acesas), os beirais (pisca-pisca), a porta (guirlanda), o telhado (neve) e o lugar
-  da chaminé (Papai Noel); metade das casas sai espelhada. Pra trazer outro: baixar do Sketchfab,
-  tirar interior e vidro com transmissão, texturas 512 em WebP e meshopt (`@gltf-transform`),
-  mirar em menos de 1 MB.
+  o prédio usa o modelo feito por código. Hoje: as casas dos 3 níveis (`CASAS_PRONTAS`, sorteadas
+  pelo id), todas de AleixoAlonso no Sketchfab, CC BY 4.0, crédito nos Ajustes: nível 1
+  May-Flower 39/371 e Fleetwood, nível 2 Glenwood 45/45-R3, nível 3 American House.
+  `prepararCasa` acha sozinho no modelo a frente (porta colorida "Accent" ou calçada) e gira pra
+  +z, as janelas (acesas), os beirais (pisca-pisca, pela face de cima do telhado), a porta
+  (guirlanda), o telhado (neve) e a chaminé (a do modelo ou uma de tijolo); metade sai espelhada.
+  Em localhost, `__teste.prontos()` mostra o que achou em cada um.
+- **Os .glb ficam no R2** (bucket `natal-modelos`, binding `MODELOS`): o Worker serve
+  `/assets/modelos/*` de lá, porque o plano grátis limita o pacote do Worker a 3 MB. Depois de
+  trocar ou acrescentar um modelo: `node scripts/subir-modelos.mjs`. Local e no app eles saem
+  da pasta mesmo. Pra trazer outro: baixar do Sketchfab, tirar interior e vidro com
+  transmissão, texturas 256–512 em WebP e meshopt (`@gltf-transform`), mirar em < 700 KB.
 - **Igreja** (`igreja`, nível 9, 4×4): o mesmo modelo da igreja do bairro vizinho (`makeIgreja`).
   **Presépio** com Sagrada Família, boi e burrinho, reis magos, pastor e estrela guia.
 - **Desempenho**: `criarModelo` passa todo prédio por `otimizar()`, que junta as peças paradas
