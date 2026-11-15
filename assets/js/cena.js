@@ -749,9 +749,9 @@ function predioComercial({ w, d, H, cor, telhado = 0x4a4d55, nome, toldo1, toldo
   const zf = d / 2 + 0.01;
   const vit = janelaR(w * 0.62, 2.2, 4, 2); vit.position.set(-w * 0.12, base + 1.5, zf); g.add(vit);
   const porta = janelaR(1.2, 2.5, 1, 3); porta.position.set(w * 0.33, base + 1.35, zf); g.add(porta);
-  toldo(g, w * 0.95, 0, base + 3.0, zf, toldo1, toldo2);
+  toldo(g, w * 0.95, 0, base + 2.7, zf, toldo1, toldo2);
   if (andares >= 2) for (const x of [-w * 0.3, 0, w * 0.3]) { const j = janelaR(1.0, 1.4, 2, 2); j.position.set(x, base + H - 1.4, zf); g.add(j); }
-  placa(g, nome, Math.min(w * 0.8, 6), 0, base + (andares >= 2 ? H - 2.9 : H - 0.55), zf + 0.1);
+  placa(g, nome, Math.min(w * 0.8, 6), 0, base + (andares >= 2 ? H - 2.9 : H - 0.2), zf + 0.1);
   for (const x of [-w / 2 - 0.15, w / 2 + 0.15]) { const l = lanternaR(); l.position.set(x, base + 2.4, zf - 0.1); g.add(l); }
   ledsFrontao(g, fr);
   g.userData.zf = zf; g.userData.H = H + base;
@@ -977,8 +977,57 @@ function makeOficina() {
   return finalizar(g, 13, [V3(-3, base + 11.4, -2.6), V3(3, base + 11.4, -2.6)]);
 }
 
+// padaria realista: loja de esquina com vitrine, toldo, biscoito gigante e chaminé do forno
+function makePadariaReal() {
+  const g = predioComercial({ w: 6.4, d: 5.2, H: 3.8, cor: tintas.creme, telhado: 0x5a3e36, nome: 'Padaria de Biscoitos', toldo1: '#8a5a3c', toldo2: '#f6e7cf' });
+  const bisc = new THREE.Group(); bisc.position.set(0, 7.0, 0.4); g.add(bisc);
+  bisc.add(mR(new THREE.CylinderGeometry(1.0, 1.0, 0.25, 28), mat(0xc98a4b, { roughness: 0.9 }), 0, 0, 0).rotateX(Math.PI / 2));
+  for (const [x, y] of [[-0.35, 0.25], [0.3, -0.1], [-0.05, -0.45], [0.4, 0.45], [-0.5, -0.2]]) bisc.add(mR(new THREE.SphereGeometry(0.1, 6, 6), mat(0x4a2a14), x, y, 0.14));
+  g.add(caixa(0.8, 2.4, 0.8, tijolo, 2.2, 6.4, -1.3)); g.add(caixa(1.0, 0.2, 1.0, snowMat, 2.2, 7.7, -1.3));
+  for (let i = 0; i < 4; i++) { const p = mR(new THREE.CylinderGeometry(0.22, 0.2, 0.12, 14), mat(0xd9a066), -2.1 + i * 0.45, 1.25, 2.68); p.rotation.x = Math.PI / 2; g.add(p); }
+  return finalizar(g, 9, [V3(2.2, 8.2, -1.3)]);
+}
+// rinque realista: gelo com muretas brancas, refletores, cabine de aluguel de patins e pinheiros com pisca
+function makeRinqueReal() {
+  const g = new THREE.Group(), gelo = new THREE.MeshStandardMaterial({ color: 0xa8d8ff, roughness: 0.05, metalness: 0.2, emissive: 0x16344f, emissiveIntensity: 0.5 }), mureta = mat(0xf4f4f2, { roughness: 0.6 });
+  g.add(caixa(9.6, 0.15, 9.6, snowMat, 0, 0.07, 0));
+  g.add(rbox(7.6, 0.12, 5.6, 0.05, gelo, 0, 0.2, -0.8));
+  for (const [w, d, x, z] of [[7.8, 0.15, 0, -3.65], [7.8, 0.15, 0, 2.05], [0.15, 5.8, -3.9, -0.8], [0.15, 5.8, 3.9, -0.8]]) { g.add(caixa(w, 0.6, d, mureta, x, 0.5, z)); g.add(caixa(w, 0.1, d, mat(0xc8202a), x, 0.82, z)); }
+  for (const [x, z] of [[-4.3, -4], [4.3, -4], [-4.3, 2.4], [4.3, 2.4]]) {
+    g.add(mR(new THREE.CylinderGeometry(0.07, 0.09, 4.4, 8), MR.preto, x, 2.2, z));
+    g.add(caixa(0.6, 0.3, 0.3, MR.preto, x * 0.92, 4.4, z * 0.92));
+    g.add(mR(new THREE.BoxGeometry(0.45, 0.2, 0.05), MR.lampada, x * 0.92, 4.38, z * 0.92 + (z > 0 ? -0.16 : 0.16)));
+  }
+  ledsLinha(g, V3(-4.3, 4.1, -4), V3(4.3, 4.1, -4), 26, bulbMat); ledsLinha(g, V3(-4.3, 4.1, 2.4), V3(4.3, 4.1, 2.4), 26, bulbMat);
+  const cab = new THREE.Group(); cab.position.set(2.6, 0, 3.6); g.add(cab);
+  cab.add(caixa(2.4, 2.2, 1.6, paredeDe(tintas.vermelho), 0, 1.25, 0));
+  cab.add(caixa(2.7, 0.2, 1.9, snowMat, 0, 2.45, 0));
+  const jan = janelaR(1.2, 0.8, 2, 1); jan.position.set(0, 1.5, 0.81); cab.add(jan);
+  placa(cab, 'Patins', 1.8, 0, 2.15, 0.9);
+  for (const x of [-3.6, -2.4]) { const p = makePinheiroReal('abeto', { luzes: 1 }, 0.42); p.position.set(x, 0, 3.7); g.add(p); }
+  // patinadores (pessoinhas no gelo) são os moradores; aqui só uma placa de pista
+  return finalizar(g, 4.6);
+}
+// carro comum realista (sedã/utilitário), com neve no teto e às vezes um pinheiro amarrado
+function makeCarReal(cor, comArvore, suv) {
+  const g = new THREE.Group(), lata = mat(cor, { roughness: 0.3, metalness: 0.45 });
+  const lado = new THREE.Shape(), alto = suv ? 0.25 : 0;
+  lado.moveTo(-2.1, 0.3); lado.lineTo(2.05, 0.3); lado.quadraticCurveTo(2.25, 0.32, 2.2, 0.75); lado.lineTo(1.35, 0.9 + alto * 0.4);
+  lado.lineTo(0.75, 1.45 + alto); lado.lineTo(-1.3, 1.45 + alto); lado.lineTo(-1.95, 0.95 + alto * 0.5); lado.quadraticCurveTo(-2.2, 0.85, -2.1, 0.3);
+  g.add(mR(new THREE.ExtrudeGeometry(lado, { depth: 1.6, bevelEnabled: true, bevelThickness: 0.1, bevelSize: 0.1, bevelSegments: 2, curveSegments: 8 }), lata, 0, 0, -0.8));
+  const vid = new THREE.Shape(); vid.moveTo(1.25, 0.95 + alto * 0.4); vid.lineTo(0.7, 1.38 + alto); vid.lineTo(-1.22, 1.38 + alto); vid.lineTo(-1.8, 0.98 + alto * 0.5); vid.closePath();
+  g.add(mR(new THREE.ExtrudeGeometry(vid, { depth: 1.66, bevelEnabled: false }), vidroMat, 0, 0, -0.83));
+  for (const x of [-1.35, 1.35]) for (const z of [-0.82, 0.82]) { const w = mR(new THREE.CylinderGeometry(0.36, 0.36, 0.26, 14), pneuMat, x, 0.36, z); w.rotation.x = Math.PI / 2; g.add(w); }
+  for (const z of [-0.55, 0.55]) { g.add(mR(new THREE.SphereGeometry(0.1, 8, 6), MR.lampada, 2.22, 0.62, z)); g.add(mR(new THREE.BoxGeometry(0.05, 0.1, 0.32), new THREE.MeshBasicMaterial({ color: new THREE.Color(3, 0.2, 0.2), toneMapped: false }), -2.18, 0.7, z)); }
+  g.add(caixa(2.0, 0.14, 1.5, snowMat, -0.25, 1.55 + alto, 0));
+  if (comArvore) { const p = makePinheiroReal('pinheiro', {}, 0.18); p.rotation.z = Math.PI / 2; p.position.set(0.7, 1.75 + alto, 0); g.add(p); }
+  const feixe = mR(new THREE.PlaneGeometry(4, 2.2), poolMat, 3.1, 0.06, 0); feixe.rotation.x = -Math.PI / 2; feixe.userData.noShadow = true; g.add(feixe);
+  g.scale.setScalar(0.62);
+  const out = new THREE.Group(); out.add(g); return out;
+}
+
 export const MODELOS = {
-  praca: makePlaza, casa: makeHouse, fabrica: makeFactory, padaria: makeBakery, rinque: makeRink,
+  praca: makePlaza, casa: makeHouse, fabrica: makeFactory, padaria: makePadariaReal, rinque: makeRinqueReal,
   correio: makeCorreio, confeitaria: makeConfeitaria, loja: makeLoja, estacao: makeEstacao, mercado: makeMercado, renas: makeRenas,
   pista: makePista, presepio: makePresepio, roda: makeRoda, chafariz: makeChafariz, teatro: makeTeatro, arvoreGigante: makeArvoreGigante,
   castelo: makeCastelo, arco: makeArco, pousada: makePousada, estatua: makeEstatua, oficina: makeOficina,
@@ -1556,7 +1605,7 @@ export async function criarCena(canvas) {
   // carros na rua principal (dois sentidos)
   const carros = [];
   [[0xd8333a, true, 1, 0], [0x1d3a6e, false, -1, 1], [0x2f9e5b, false, 1, 0], [0xf2a93b, true, -1, 0], [0x202226, false, 1, 1], [0xc0182c, false, -1, 1], [0xe8e8ea, false, 1, 1], [0x8a5cc8, true, -1, 0]].forEach(([cor, arv, sent, esportivo], i) => {
-    const c = esportivo ? (() => { const g = new THREE.Group(), e = carroEsportivo(cor); e.scale.setScalar(0.62); g.add(e); const f = mesh(new THREE.PlaneGeometry(4, 2.2), poolMat, 3.1, 0.06, 0); f.rotation.x = -Math.PI / 2; g.add(f); return g; })() : makeCar(cor, arv);
+    const c = esportivo ? (() => { const g = new THREE.Group(), e = carroEsportivo(cor); e.scale.setScalar(0.62); g.add(e); const f = mesh(new THREE.PlaneGeometry(4, 2.2), poolMat, 3.1, 0.06, 0); f.rotation.x = -Math.PI / 2; g.add(f); return g; })() : makeCarReal(cor, arv, i % 3 === 2);
     c.traverse(m => { if (m.isMesh) m.castShadow = !m.userData.noShadow; });
     c.userData.sentido = sent; c.userData.vel = R(7, 10); c.position.set(-150 + i * 40, 0, RUA_Z + sent * 0.75); c.rotation.y = sent > 0 ? 0 : Math.PI;
     scene.add(c); carros.push(c);
