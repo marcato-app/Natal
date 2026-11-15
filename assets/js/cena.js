@@ -1517,7 +1517,7 @@ export async function criarCena(canvas) {
 
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(devicePixelRatio, coarse ? 1.5 : 2));
-  renderer.setSize(innerWidth, innerHeight);
+  renderer.setSize(canvas.clientWidth || innerWidth, canvas.clientHeight || innerHeight, false);
   renderer.info.autoReset = false; // conta os desenhos do quadro inteiro (bloom tem várias passadas)
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -1793,7 +1793,7 @@ export async function criarCena(canvas) {
   controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE };
   controls.target.set(0, 0, 1);
   function enquadrar() {
-    camera.aspect = innerWidth / innerHeight;
+    camera.aspect = (canvas.clientWidth || innerWidth) / (canvas.clientHeight || innerHeight);
     camera.fov = camera.aspect < 1 ? THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(19)) / camera.aspect)) : 36;
     camera.updateProjectionMatrix();
   }
@@ -1812,7 +1812,7 @@ export async function criarCena(canvas) {
   let modo = 'vila', casaAtual = null;
   const cam = () => (modo === 'casa' ? salaCam : camera);
   function enquadrarSala() {
-    salaCam.aspect = innerWidth / innerHeight;
+    salaCam.aspect = (canvas.clientWidth || innerWidth) / (canvas.clientHeight || innerHeight);
     salaCam.fov = salaCam.aspect < 1 ? THREE.MathUtils.radToDeg(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(24)) / salaCam.aspect)) : 42;
     salaCam.updateProjectionMatrix();
   }
@@ -2041,29 +2041,35 @@ export async function criarCena(canvas) {
   let neve = 1;
 
   // ---------- qualidade automática ----------
-  // 2 = tudo; 1 = sem brilho (bloom) e resolução menor; 0 = também sem sombras e com menos neve.
-  // Começa na melhor e desce sozinha se o aparelho não aguentar ~40 quadros por segundo.
-  const lerQ = () => { try { return localStorage.getItem('natal.qualidade'); } catch { return null; } };
-  const forcada = new URLSearchParams(location.search).get('qualidade');
-  let qualidade = forcada != null ? Number(forcada) : Number(lerQ() ?? 2);
-  let medQuadros = 0, medTempo = 0, boas = 0, rebaixou = false;
+  // 2 = tudo; 1 = sem brilho (bloom) e resolução um pouco menor; 0 = também sem sombras e com
+  // menos neve. Começa na melhor e desce sozinha se o aparelho cair abaixo de ~24 quadros por
+  // segundo (o Modo de Pouca Energia do iPhone trava em 30 e não deve rebaixar). O automático
+  // vale só pra sessão; o que o jogador escolhe em Ajustes fica gravado.
+  const lerQ = () => { try { return localStorage.getItem('natal.qualidade2'); } catch { return null; } };
+  const forcada = new URLSearchParams(location.search).get('qualidade') ?? lerQ();
+  let qualidade = forcada != null ? Number(forcada) : 2;
+  let medQuadros = 0, medTempo = 0, boas = 0, rebaixou = 0;
   function aplicarQualidade(q) {
     qualidade = Math.max(0, Math.min(2, q));
     bloom.enabled = qualidade >= 2;
     moon.castShadow = qualidade >= 1;
-    renderer.setPixelRatio(Math.min(devicePixelRatio, [1, 1.25, coarse ? 1.5 : 2][qualidade]));
-    composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(innerWidth, innerHeight);
+    renderer.setPixelRatio(Math.min(devicePixelRatio, [1.5, 1.75, 2][qualidade]));
+    composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(canvas.clientWidth || innerWidth, canvas.clientHeight || innerHeight);
     maxFlocos = qualidade === 0 ? Math.floor(flakeN / 3) : flakeN;
-    try { localStorage.setItem('natal.qualidade', String(qualidade)); } catch { /* sem armazenamento */ }
+  }
+  let escolhida = forcada != null;
+  function escolherQualidade(q) {
+    escolhida = true; aplicarQualidade(q);
+    try { localStorage.setItem('natal.qualidade2', String(qualidade)); } catch { /* sem armazenamento */ }
   }
   aplicarQualidade(qualidade);
   function medirQualidade(dtReal) {
-    if (forcada != null || document.hidden) return;
+    if (escolhida || document.hidden) { medQuadros = 0; medTempo = 0; return; }
     medQuadros++; medTempo += dtReal;
     if (medTempo < 4) return;
     const fps = medQuadros / medTempo; medQuadros = 0; medTempo = 0;
-    if (fps < 38 && qualidade > 0) { aplicarQualidade(qualidade - 1); rebaixou = true; boas = 0; }
-    else if (fps > 57 && qualidade < 2 && !rebaixou && ++boas >= 3) { aplicarQualidade(qualidade + 1); boas = 0; }
+    if (fps < 24 && qualidade > 0) { aplicarQualidade(qualidade - 1); rebaixou++; boas = 0; }
+    else if (fps > 50 && qualidade < 2 && rebaixou < 2 && ++boas >= 3) { aplicarQualidade(qualidade + 1); boas = 0; }
   }
 
   // ---------- loop ----------
@@ -2295,16 +2301,25 @@ export async function criarCena(canvas) {
     }
   }
 
-  addEventListener('resize', () => {
-    enquadrar(); enquadrarSala(); aplicarDesloc(); renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); bloom.resolution.set(innerWidth, innerHeight);
-  });
+  // O canvas ocupa a tela pelo CSS; aqui só a resolução interna acompanha. No iPhone a área
+  // visível muda quando as barras do Safari aparecem/somem e nem sempre vem 'resize', então
+  // o tamanho é conferido a cada quadro.
+  let largura = 0, altura = 0;
+  function ajustarTamanho() {
+    const w = canvas.clientWidth || innerWidth, h = canvas.clientHeight || innerHeight;
+    if (w === largura && h === altura) return;
+    largura = w; altura = h;
+    enquadrar(); enquadrarSala(); aplicarDesloc(); renderer.setSize(w, h, false); composer.setSize(w, h); bloom.resolution.set(w, h);
+  }
+  addEventListener('resize', ajustarTamanho);
+  ouvintes.push(ajustarTamanho);
   requestAnimationFrame(frame);
 
   return {
     sincronizar, setFantasma, setDeslocamento, centroTerreno, entrarCasa, sairCasa, sincSala, itemEm, posItem, modo: () => modo, setGrade, setSelecionado, esconder, loteEm, predioEm, projetar, topoDe, focar, miniaturas,
     aoQuadro: fn => ouvintes.push(fn),
     papaiNoel, chamineDe, noelVoando: () => noel.voando,
-    qualidade: () => qualidade, setQualidade: aplicarQualidade, neve: () => neve,
+    qualidade: () => qualidade, setQualidade: escolherQualidade, neve: () => neve,
     pecas: () => { const r = {}; for (const e of predios.values()) { let m = 0, t = 0; e.obj.traverse(o => { if (o.isMesh) { m++; const g = o.geometry; t += (g.index ? g.index.count : g.attributes.position.count) / 3 * (o.isInstancedMesh ? o.count : 1); } }); const x = r[e.tipo] || (r[e.tipo] = { n: 0, pecas: 0, tri: 0 }); x.n++; x.pecas += m; x.tri += Math.round(t); } let ce = 0; scene.traverse(o => { if (o.isMesh) ce++; }); r._cenaToda = ce; return r; },
     memoria: () => ({ ...renderer.info.memory, desenhos: renderer.info.render.calls, triangulos: renderer.info.render.triangles }),
     controls,

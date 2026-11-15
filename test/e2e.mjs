@@ -54,6 +54,10 @@ try {
     const caixas = await p.evaluate(() => [...document.querySelectorAll('.hud, #nav')].map(e => e.getBoundingClientRect()).map(r => ({ l: r.left, r: r.right, t: r.top, b: r.bottom })));
     check('interface dentro da tela', caixas.every(c => c.l >= -1 && c.t >= -1 && c.r <= viewport.width + 1 && c.b <= viewport.height + 1), caixas);
 
+    const rola = await p.evaluate(() => { const e = document.scrollingElement; e.scrollLeft = 50; e.scrollTop = 50; return { x: e.scrollLeft, y: e.scrollTop }; });
+    check('página não rola pro lado nem pra baixo', rola.x === 0 && rola.y === 0, rola);
+    const tam = await p.evaluate(() => { const c = document.getElementById('cena'); return { c: [c.clientWidth, c.clientHeight], w: [innerWidth, innerHeight] }; });
+    check('cena ocupa a tela toda', tam.c[0] === tam.w[0] && tam.c[1] === tam.w[1], tam);
     // menu de construir abre e fecha
     await p.click('[data-abrir="construir"]'); await p.waitForTimeout(600);
     check('menu construir abre', await p.isVisible('#sheet-construir'));
@@ -82,6 +86,8 @@ try {
     // gira o aparelho no meio do jogo
     await p.setViewportSize({ width: viewport.height, height: viewport.width }); await p.waitForTimeout(1200);
     await p.screenshot({ path: `${TELAS}${nome}-5-girado.png` });
+    const desenho = await p.evaluate(() => { const c = document.getElementById('cena'); return { buf: c.width / devicePixelRatio, css: c.clientWidth }; });
+    check('resolução acompanha o giro', Math.abs(desenho.css - (viewport.height)) <= 1, desenho);
 
     // recarrega sem internet: abre com a cópia local
     await ctx.setOffline(true);

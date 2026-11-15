@@ -26,6 +26,7 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 html, body { height: 100%; margin: 0; }
+html { overflow: hidden; overscroll-behavior: none; }
 body { background: var(--night); color: var(--snow); font-family: var(--body); overflow: hidden; -webkit-user-select: none; user-select: none; overscroll-behavior: none; }
 #cena { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 #ui {
@@ -209,7 +210,7 @@ body.visitando .hud .lvl, body.visitando .linha-topo { display: none; }
 .place-btns { display: flex; gap: 8px; }
 
 /* balões sobre os prédios */
-#baloes { position: fixed; inset: 0; pointer-events: none; }
+#baloes { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
 .balao { position: absolute; left: 0; top: 0; display: flex; align-items: center; gap: 6px; padding: 6px 12px 6px 6px; border-radius: 999px; border: 0; background: var(--snow); color: var(--gold-ink); font: 700 15px/1 var(--display); box-shadow: 0 6px 18px rgba(0,0,0,.35); white-space: nowrap; pointer-events: auto; cursor: pointer; min-height: 36px; }
 .balao::after { content: ""; position: absolute; left: 50%; bottom: -7px; margin-left: -7px; border: 7px solid transparent; border-bottom: 0; border-top-color: var(--snow); }
 .balao svg { width: 24px; height: 24px; }
