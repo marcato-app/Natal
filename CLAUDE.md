@@ -111,6 +111,25 @@ então nada vem de CDN; `sw.js` guarda tudo no aparelho pra abrir offline.
   toque; preferências em `localStorage['natal.som']`.
 - Boas-vindas no primeiro acesso (`localStorage['natal.boasvindas']`).
 
+### Pedidos, evento, coleção e ranking (o que prende)
+
+- **Pedidos dos moradores** (`v.pedidos`, ações `pedido` e `trocarPedido`): quadro com 3–5
+  pedidos (`vagasPedidos`) que trocam doces por moedas e vice-versa, com alegria, às vezes
+  estrela e peça rara. Entregou, outro chega em `PEDIDO_ESPERA`; trocou, em `PEDIDO_TROCA`.
+  O conteúdo sai de `v.pedSeq` (contador próprio, não mexe no `seq` dos prédios) passado por
+  `sorte()`, um embaralhador fixo: navegador e servidor geram o mesmo pedido.
+- **Evento da semana** (`EVENTOS`, `eventoAtual`, `meuEvento`): começa toda segunda (Brasília),
+  com tema que dobra uma fonte de pontos (`PONTOS`: pedido, coleta, aluguel, presente). A
+  `TRILHA` de prêmios (ação `eventoPremio`) termina numa decoração exclusiva (`TIPOS[x].exclusivo`,
+  em `v.exclusivos`: só aparece no menu Construir quando ganha).
+- **Coleção** (`COLECAO`, `v.colecao`, ação `colecao`): séries de enfeites raros; peças vêm de
+  pedidos e da trilha; série completa vira prêmio (e pode repetir).
+- **Ranking** (`GET /api/ranking`): eu + amigos pelos pontos do evento; ao abrir, o jogo avisa
+  quem te passou (`localStorage['natal.ranking']`). **Cartão-postal** (painel Amigos):
+  `cena.foto()` + nome, nível e código → compartilhar do celular ou baixar.
+- **Avisos no app** (`@capacitor/local-notifications`): ao ir pro fundo agenda produção cheia,
+  pedido novo e presente das 10h; cancela ao voltar. Permissão pedida no 1º pedido entregue.
+
 ### Como o salvamento funciona
 
 A vila inteira é um JSON (formato em `regras.js`, gravado em `vilas.estado`). O
@@ -192,7 +211,8 @@ anúncios precisam de internet.
 
 `node scripts/simular.mjs [dias] [sessõesPorDia] [minutos]` joga no automático com as
 regras reais e mostra em que dia chega a cada nível (`--dias` imprime dia a dia). Meta
-atual: jogando 4×5 min por dia, nível 2 no 1º dia e nível 20 perto do dia 40 (Natal).
+atual: jogando 4×5 min por dia (entregando pedidos), nível 2 no 1º dia e nível 20 perto do
+dia 40 (Natal). `--sem-pedidos` mostra o ritmo sem o quadro.
 Decoração repetida dá alegria decrescente (2ª metade, 3ª um terço...).
 
 ## Rodar local

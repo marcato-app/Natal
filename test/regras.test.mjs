@@ -2,7 +2,7 @@
 //
 //   node test/regras.test.mjs
 
-import { NIVEIS,
+import { NIVEIS, vagasPedidos, PEDIDO_ESPERA, PEDIDO_TROCA, eventoAtual, meuEvento, TRILHA, PONTOS, COLECAO, serieCompleta, qtdPeca, EVENTOS,
   TERRENOS, naVila, ANUNCIOS_POR_DIA, ANUNCIO_ADIANTA, anunciosHoje, presenteDeHoje, missoesAtivas, MISSOES, ADVENTO, ganharAlegria, ITENS, bloqueioItem, aluguelDe, TEMPO_ENFEITE, ALUGUEL_CICLO, novaVila, aplicar, avancar, cabe, moradia, prontos, nivelDe, TIPOS, ESTOQUE_MAX, CUSTO_DUENDE,
 } from '../assets/js/regras.js';
 
@@ -240,7 +240,7 @@ const fab = (v) => v.predios.find(p => p.tipo === 'fabrica');
   const m0 = v.moedas;
   check('cumpriu e resgata o prêmio', aplicar(v, { tipo: 'missao', id: 'coletar1' }, seg(60)).ok && v.moedas - m0 === 30);
   check('não resgata duas vezes', !aplicar(v, { tipo: 'missao', id: 'coletar1' }, seg(60)).ok);
-  check('a próxima missão entra na lista', missoesAtivas(v).some(m => m.id === 'fachada1'));
+  check('a próxima missão entra na lista', missoesAtivas(v).some(m => m.id === MISSOES[3].id));
   check('todas as missões têm id único', new Set(MISSOES.map(m => m.id)).size === MISSOES.length);
 }
 
@@ -293,6 +293,67 @@ const fab = (v) => v.predios.find(p => p.tipo === 'fabrica');
 
 check('ação desconhecida falha', !aplicar(novaVila(T0), { tipo: 'hackear' }, T0).ok);
 check('ação vazia falha', !aplicar(novaVila(T0), null, T0).ok);
+
+// pedidos dos moradores
+{
+  const v = novaVila(T0); avancar(v, seg(1));
+  check('quadro começa com 3 pedidos', v.pedidos.length === vagasPedidos(v) && v.pedidos.length === 3);
+  const w = novaVila(T0); avancar(w, seg(5));
+  check('pedidos são os mesmos nos dois lados (sem sorteio)', JSON.stringify(v.pedidos.map(p => [p.id, p.pede, p.paga, p.peca])) === JSON.stringify(w.pedidos.map(p => [p.id, p.pede, p.paga, p.peca])));
+  const seqAntes = v.seq;
+  const ped = v.pedidos[0];
+  v.moedas = 0; v.doces = 0;
+  check('sem recursos não entrega', !aplicar(v, { tipo: 'pedido', id: ped.id }, seg(2)).ok);
+  v.moedas = 5000; v.doces = 5000;
+  const antes = { moedas: v.moedas, doces: v.doces, alegria: v.alegria };
+  const r = aplicar(v, { tipo: 'pedido', id: ped.id }, seg(3));
+  check('entregar pedido paga e cobra', r.ok && v.alegria === antes.alegria + ped.paga.alegria && Object.entries(ped.pede).every(([k, q]) => v[k] <= antes[k] - q + (ped.paga[k] || 0)), r);
+  check('pedido não mexe no seq dos prédios', v.seq === seqAntes);
+  check('entregar conta pontos do evento', meuEvento(v, seg(3)).pontos >= PONTOS.pedido);
+  const novo = v.pedidos.find(p => p.id !== ped.id && p.chega > seg(3));
+  check('pedido novo chega depois da espera', novo && novo.chega === seg(3) + PEDIDO_ESPERA * 1000);
+  check('pedido que não chegou não entrega', !aplicar(v, { tipo: 'pedido', id: novo.id }, seg(4)).ok);
+  check('pedido chega com o tempo', aplicar(v, { tipo: 'pedido', id: novo.id }, seg(4 + PEDIDO_ESPERA)).ok);
+  const outro = v.pedidos.find(p => p.chega <= seg(10 + PEDIDO_ESPERA));
+  check('trocar pedido', aplicar(v, { tipo: 'trocarPedido', id: outro.id }, seg(10 + PEDIDO_ESPERA)).ok && v.pedidos.some(p => p.chega === seg(10 + PEDIDO_ESPERA) + PEDIDO_TROCA * 1000));
+  const g = novaVila(T0); g.alegria = NIVEIS[9]; avancar(g, seg(1));
+  check('nível 10 tem 5 pedidos', g.pedidos.length === 5);
+  check('pedido entregue conta pra missão', (v.stats.pedidos || 0) === 2);
+}
+
+// evento da semana e trilha de prêmios
+{
+  const t = Date.UTC(2026, 10, 18, 15);
+  check('evento muda toda semana', eventoAtual(t).id !== eventoAtual(t + 7 * 86400000).id && eventoAtual(t).fim > t && eventoAtual(t).fim - t <= 7 * 86400000);
+  const v = novaVila(t); avancar(v, t + 1);
+  check('prêmio sem pontos falha', !aplicar(v, { tipo: 'eventoPremio', n: 0 }, t + 2).ok);
+  v.evento = { chave: eventoAtual(t).chave, pontos: 1000, premios: [] };
+  let ok = true; for (let n = 0; n < TRILHA.length; n++) ok = aplicar(v, { tipo: 'eventoPremio', n }, t + 3).ok && ok;
+  check('trilha inteira resgata', ok);
+  check('prêmio não repete', !aplicar(v, { tipo: 'eventoPremio', n: 0 }, t + 4).ok);
+  const exc = eventoAtual(t).exclusivo;
+  check('fim da trilha dá decoração exclusiva', v.exclusivos[exc] === 1);
+  check('trilha dá peças da coleção', Object.values(v.colecao || {}).reduce((a, b) => a + b, 0) === 2);
+  check('exclusiva constrói de graça uma vez', aplicar(v, { tipo: 'construir', predio: exc, x: 0, z: 0 }, t + 5).ok && v.exclusivos[exc] === 0);
+  check('exclusiva sem prêmio não constrói', !aplicar(v, { tipo: 'construir', predio: exc, x: 3, z: 0 }, t + 6).ok);
+  check('pontos zeram no evento seguinte', meuEvento(v, t + 7 * 86400000).pontos === 0);
+  const w = novaVila(t); avancar(w, t + 1);
+  const tema = eventoAtual(t);
+  const r = aplicar(w, { tipo: 'presente' }, t + 2);
+  check('presente diário dá pontos', r.ok && r.pontos === PONTOS.presente * (tema.dobro === 'presente' ? 2 : 1));
+}
+
+// coleção
+{
+  const v = novaVila(T0); avancar(v, seg(1));
+  const sr = COLECAO[0];
+  check('série incompleta não resgata', !aplicar(v, { tipo: 'colecao', serie: sr.id }, seg(2)).ok);
+  v.colecao = Object.fromEntries(sr.pecas.map((_, i) => [`${sr.id}:${i}`, 1]));
+  v.colecao[`${sr.id}:0`] = 2;
+  const e = v.estrelas;
+  check('série completa resgata', aplicar(v, { tipo: 'colecao', serie: sr.id }, seg(3)).ok && v.estrelas === e + sr.premio.estrelas);
+  check('resgatar gasta uma de cada peça', qtdPeca(v, `${sr.id}:0`) === 1 && qtdPeca(v, `${sr.id}:1`) === 0 && !serieCompleta(v, sr));
+}
 
 console.log(`\n${pass} ok, ${fail} falharam`);
 if (fail) process.exit(1);

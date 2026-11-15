@@ -129,8 +129,45 @@ button.pill { border: 1px solid var(--line); color: var(--snow); cursor: pointer
 .balao.obra svg { width: 16px; height: 16px; color: var(--gold); }
 
 /* missões, presente, ajustes */
-.linha-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.missao-chip { position: relative; display: flex; align-items: center; gap: 8px; min-height: 40px; max-width: min(78vw, 360px); padding: 6px 14px 6px 10px; border-radius: 20px; font-weight: 800; font-size: 13px; text-align: left; cursor: pointer; }
+.linha-topo { display: flex; align-items: center; justify-content: space-between; gap: 8px 10px; flex-wrap: wrap; }
+.evento-chip { position: relative; order: 3; display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 5px 12px 5px 10px; border-radius: 18px; font-weight: 800; font-size: 13px; cursor: pointer; }
+.evento-chip svg { width: 18px; height: 18px; color: var(--gold); flex-shrink: 0; }
+.evento-chip span { white-space: nowrap; }
+.ev-barra { display: block; width: 56px; height: 6px; border-radius: 3px; background: rgba(255,255,255,.15); overflow: hidden; }
+.ev-barra i { display: block; height: 100%; width: 0; background: var(--gold); border-radius: 3px; }
+.ev-topo { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; background: rgba(255,201,77,.12); }
+.ev-pontos { display: flex; flex-direction: column; align-items: center; min-width: 70px; }
+.ev-pontos b { font: 700 28px/1 var(--display); color: var(--gold); }
+.ev-pontos span { font-size: 12px; opacity: .75; }
+.ev-como { font-size: 12px; line-height: 1.45; opacity: .85; }
+.passo.feito { opacity: .55; }
+.passo .linha { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 4px; font-size: 13px; font-weight: 800; }
+.passo .linha span { display: inline-flex; align-items: center; gap: 3px; }
+.passo .linha svg, .peca-tag svg { width: 15px; height: 15px; }
+.pedido .quem { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font: 700 17px var(--display); background: var(--berry); color: #fff; flex-shrink: 0; }
+.pedido .item-info { flex: 1; min-width: 0; }
+.pedido .linha { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 13px; }
+.pedido .linha span { display: inline-flex; align-items: center; gap: 3px; }
+.pedido .linha svg { width: 16px; height: 16px; }
+.pedido .linha .falta { color: #ff9a9d; }
+.pedido .rotulo { opacity: .65; font-size: 12px; font-weight: 700; }
+.pedido.esperando { opacity: .6; }
+.pedido .botoes { display: flex; gap: 6px; align-items: center; }
+.pedido .trocar { width: 38px; height: 38px; border-radius: 12px; border: 0; background: rgba(255,255,255,.1); color: var(--snow); display: grid; place-items: center; cursor: pointer; }
+.pedido .trocar svg { width: 18px; height: 18px; }
+.peca-tag { display: inline-flex; align-items: center; gap: 3px; padding: 1px 7px; border-radius: 10px; background: rgba(160,120,255,.25); font-size: 11px; font-weight: 800; }
+.serie .pecas { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.serie .pc { padding: 3px 8px; border-radius: 10px; font-size: 12px; font-weight: 700; background: rgba(255,255,255,.08); opacity: .45; }
+.serie .pc.tem { opacity: 1; background: rgba(160,120,255,.3); }
+.act.largo { width: 100%; justify-content: center; }
+.act.postal { background: rgba(255,201,77,.16); border-color: rgba(255,201,77,.4); }
+.rk { display: flex; align-items: center; gap: 10px; }
+.rk .pos { width: 30px; text-align: center; font: 700 18px var(--display); color: var(--muted); }
+.rk.top1 .pos { color: var(--gold); }
+.rk.eu { background: rgba(70,200,140,.16); }
+.rk .pts { margin-left: auto; text-align: right; font-weight: 900; }
+.rk .pts small { display: block; font-weight: 700; opacity: .65; font-size: 11px; }
+.missao-chip { flex: 0 1 auto; min-width: 0; position: relative; display: flex; align-items: center; gap: 8px; min-height: 40px; max-width: min(calc(100% - 56px), 360px); padding: 6px 14px 6px 10px; border-radius: 20px; font-weight: 800; font-size: 13px; text-align: left; cursor: pointer; }
 .missao-chip svg { width: 20px; height: 20px; color: var(--gold); }
 .missao-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ponto { position: absolute; top: -3px; right: -3px; width: 14px; height: 14px; border-radius: 50%; background: var(--berry); border: 2px solid var(--night); }
@@ -245,6 +282,10 @@ body.visitando .hud .lvl, body.visitando .linha-topo { display: none; }
   .pill svg { width: 20px; height: 20px; }
   .missao-chip { min-height: 34px; max-width: 46vw; }
   .linha-topo { justify-content: flex-start; }
+  .evento-chip { order: 0; min-height: 34px; }
+  .ev-barra { width: 36px; }
+  .nav .ic { width: 44px !important; height: 44px !important; }
+  .nav { gap: 4px; }
   .linha-topo .round { width: 38px; height: 38px; }
   .nav { position: fixed; right: max(12px, env(safe-area-inset-right)); bottom: max(10px, env(safe-area-inset-bottom)); flex-direction: column; gap: 6px; }
   .nav button { font-size: 11px; gap: 2px; }

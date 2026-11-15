@@ -1310,10 +1310,71 @@ function makeCarReal(cor, comArvore, suv) {
   const out = new THREE.Group(); out.add(g); return out;
 }
 
+// ---------- decorações exclusivas do evento (lote 2x2 = 5x5) ----------
+function makeCasaBiscoito() {
+  const g = new THREE.Group(), massa = mat(0xb5733d, { roughness: 0.85 }), glace = mat(0xfff6ee, { roughness: 0.6 }), bala = (c) => mat(c, { roughness: 0.3 });
+  g.add(caixa(4.4, 0.2, 4.4, snowMat, 0, 0.1, 0));
+  g.add(caixa(2.8, 2.0, 2.4, massa, 0, 1.2, 0));
+  const fr = frontaoR({ w: 2.8, d: 2.4, h: 1.5, parede: massa, telha: glace }); fr.position.y = 2.2; g.add(fr);
+  g.add(caixa(0.7, 1.1, 0.06, mat(0x6b3a1e), 0, 0.75, 1.22)); g.add(caixa(0.8, 0.08, 0.08, glace, 0, 1.35, 1.24));
+  for (const x of [-0.95, 0.95]) { g.add(caixa(0.55, 0.55, 0.06, mat(0xffd27a, { emissive: 0xffb04a, emissiveIntensity: 0.8 }), x, 1.45, 1.22)); g.add(caixa(0.65, 0.07, 0.08, glace, x, 1.75, 1.24)); }
+  const cores = [0xe8343c, 0x2fb05a, 0xffd23b, 0x3a7bff];
+  for (let i = 0; i < 9; i++) g.add(mR(new THREE.SphereGeometry(0.11, 10, 8), bala(cores[i % 4]), -1.3 + i * 0.32, 2.25, 1.28));
+  for (const x of [-1.9, 1.9]) { // bengalas doces na entrada
+    const b = new THREE.Group(); b.position.set(x, 0, 1.9); g.add(b);
+    for (let i = 0; i < 6; i++) b.add(mR(new THREE.CylinderGeometry(0.09, 0.09, 0.25, 10), i % 2 ? glace : bala(0xe8343c), 0, 0.15 + i * 0.25, 0));
+    const curva = mR(new THREE.TorusGeometry(0.22, 0.09, 8, 16, Math.PI), bala(0xe8343c), x > 0 ? -0.22 : 0.22, 1.6, 0); b.add(curva);
+  }
+  for (const [x, z] of [[-1.6, -1.6], [1.6, -1.4]]) { const gb = new THREE.Group(); gb.position.set(x, 0, z); g.add(gb); gb.add(mR(new THREE.SphereGeometry(0.28, 12, 10), massa, 0, 0.85, 0)); gb.add(caixa(0.5, 0.6, 0.22, massa, 0, 0.35, 0)); }
+  return finalizar(g, 4.2, [V3(0.8, 3.6, -0.5)]);
+}
+function makeTunelLuzes() {
+  const g = new THREE.Group(), cores = [0xff4b5c, 0x4bff8a, 0x4b9bff, 0xffd84b, 0xff7bf0];
+  g.add(caixa(4.6, 0.12, 4.6, snowMat, 0, 0.06, 0));
+  g.add(caixa(1.6, 0.04, 4.6, mat(0x9aa3b5, { roughness: 0.9 }), 0, 0.13, 0));
+  for (let k = 0; k < 6; k++) {
+    const z = -2 + k * 0.8, arco = new THREE.Group(); arco.position.z = z; g.add(arco);
+    arco.add(mR(new THREE.TorusGeometry(1.7, 0.05, 6, 32, Math.PI), mat(0x2a2d36), 0, 0.1, 0));
+    const n = 22, im = new THREE.InstancedMesh(new THREE.SphereGeometry(0.075, 6, 4), bulbMat, n + 1), m4 = new THREE.Matrix4();
+    for (let i = 0; i <= n; i++) { const a = Math.PI * i / n; m4.makeTranslation(Math.cos(a) * 1.7, 0.1 + Math.sin(a) * 1.7, 0); im.setMatrixAt(i, m4); im.setColorAt(i, new THREE.Color(cores[(i + k) % cores.length]).multiplyScalar(2.4)); }
+    im.userData.noShadow = true; arco.add(im);
+  }
+  return finalizar(g, 2.6);
+}
+function makePresenteGigante() {
+  const g = new THREE.Group(), papel = mat(0xc8202e, { roughness: 0.5 }), fita = mat(0xffd23b, { roughness: 0.3, metalness: 0.4 });
+  g.add(caixa(4.4, 0.12, 4.4, snowMat, 0, 0.06, 0));
+  g.add(rbox ? mR(rbox(3.0, 2.4, 3.0, 0.1), papel, 0, 1.3, 0) : caixa(3.0, 2.4, 3.0, papel, 0, 1.3, 0));
+  g.add(caixa(3.06, 0.2, 3.06, papel, 0, 2.55, 0));
+  g.add(caixa(0.4, 2.62, 3.08, fita, 0, 1.33, 0)); g.add(caixa(3.08, 2.62, 0.4, fita, 0, 1.33, 0));
+  for (const r of [0.6, -0.6]) { const l = mR(new THREE.TorusGeometry(0.45, 0.14, 8, 18), fita, r, 2.95, 0); l.rotation.y = Math.PI / 2; l.scale.set(1, 0.8, 1.6); g.add(l); }
+  g.add(mR(new THREE.SphereGeometry(0.22, 12, 10), fita, 0, 2.85, 0));
+  for (const [x, z, c, s] of [[-1.9, 1.6, 0x2fb05a, 0.8], [1.8, 1.7, 0x3a7bff, 0.6], [1.9, -1.6, 0xffffff, 0.7]]) { g.add(caixa(s, s, s, mat(c, { roughness: 0.5 }), x, s / 2 + 0.1, z)); g.add(caixa(s + 0.02, 0.1, s + 0.02, fita, x, s * 0.75 + 0.1, z)); }
+  return finalizar(g, 3.6);
+}
+function makeGloboNeve() {
+  const g = new THREE.Group(), base = mat(0x5a2e1c, { roughness: 0.6 }), ouro = mat(0xe8b13a, { metalness: 0.7, roughness: 0.3 });
+  g.add(caixa(4.4, 0.12, 4.4, snowMat, 0, 0.06, 0));
+  g.add(mR(new THREE.CylinderGeometry(1.5, 1.8, 0.8, 32), base, 0, 0.5, 0));
+  g.add(mR(new THREE.TorusGeometry(1.52, 0.08, 8, 40), ouro, 0, 0.9, 0).rotateX(Math.PI / 2));
+  g.add(mR(new THREE.CylinderGeometry(1.45, 1.45, 0.08, 32), snowMat, 0, 0.95, 0));
+  // vilinha dentro
+  const t = conePinheiro(0.45, 1.6); t.position.set(0.5, 0.95, -0.3); g.add(t);
+  g.add(caixa(0.7, 0.5, 0.6, mat(0xf4f3ef), -0.4, 1.2, 0.2)); g.add(mR(new THREE.ConeGeometry(0.55, 0.4, 4), mat(0x3c4048), -0.4, 1.65, 0.2).rotateY(Math.PI / 4));
+  g.add(caixa(0.2, 0.22, 0.04, mat(0xffd27a, { emissive: 0xffb04a, emissiveIntensity: 1 }), -0.4, 1.2, 0.51));
+  const vidro = new THREE.MeshStandardMaterial({ color: 0xcfe6ff, transparent: true, opacity: 0.22, roughness: 0.05, metalness: 0.1, depthWrite: false });
+  const bola = mR(new THREE.SphereGeometry(1.5, 32, 24, 0, Math.PI * 2, 0, Math.PI * 0.8), vidro, 0, 2.15, 0); bola.userData.noShadow = true; g.add(bola);
+  const flocos = new THREE.InstancedMesh(new THREE.SphereGeometry(0.035, 4, 3), snowMat, 40), m4 = new THREE.Matrix4();
+  for (let i = 0; i < 40; i++) { const a = i * 2.39996, r = 1.2 * Math.sqrt((i + 0.5) / 40); m4.makeTranslation(Math.cos(a) * r, 1.3 + (i * 0.37 % 1.6), Math.sin(a) * r); flocos.setMatrixAt(i, m4); }
+  flocos.userData.noShadow = true; g.add(flocos);
+  return finalizar(g, 4);
+}
+
 export const MODELOS = {
   praca: makePlaza, casa: (p) => { const P = casaPronta(p); return P ? makeCasaPronta(p, P) : makeHouse(p); }, fabrica: makeFactory, padaria: makePadariaReal, rinque: makeRinqueReal,
   correio: makeCorreio, confeitaria: makeConfeitaria, loja: makeLoja, estacao: makeEstacao, mercado: makeMercado, renas: makeRenas,
-  pista: makePista, presepio: makePresepio, igreja: makeIgreja, roda: makeRoda, chafariz: makeChafariz, teatro: makeTeatro, arvoreGigante: makeArvoreGigante,
+  pista: makePista, presepio: makePresepio, igreja: makeIgreja,
+  casaBiscoito: makeCasaBiscoito, tunelLuzes: makeTunelLuzes, presenteGigante: makePresenteGigante, globoNeve: makeGloboNeve, roda: makeRoda, chafariz: makeChafariz, teatro: makeTeatro, arvoreGigante: makeArvoreGigante,
   castelo: makeCastelo, arco: makeArco, pousada: makePousada, estatua: makeEstatua, oficina: makeOficina,
   pinheiro: (p) => makePinheiroReal('pinheiro', p?.itens || {}, 0.6), abeto: (p) => makePinheiroReal('abeto', p?.itens || {}, 0.6), espruce: (p) => makePinheiroReal('espruce', p?.itens || {}, 0.6), boneco: makeSnowman, poste: makeLamp, presentes: makeGiftPile,
 };
@@ -2502,6 +2563,8 @@ export async function criarCena(canvas) {
     aoQuadro: fn => ouvintes.push(fn),
     papaiNoel, chamineDe, noelVoando: () => noel.voando,
     qualidade: () => qualidade, setQualidade: escolherQualidade, neve: () => neve,
+    // foto da cena como está agora (pro cartão-postal): desenha e lê no mesmo instante
+    foto: (tipo = 'image/jpeg') => { renderer.info.reset(); composer.render(); return renderer.domElement.toDataURL(tipo, 0.92); },
     prontos: () => Object.fromEntries(Object.entries(PRONTOS).map(([k, v]) => [k, { beirais: v.beirais.length, frente: v.beirais.filter(([a, b]) => (a.z + b.z) / 2 > 0).length, janelas: v.janelas.length, porta: !!v.porta, chamine: !!(v.chamine || v.chamineTopo), tam: v.tam.toArray().map(x => +x.toFixed(1)) }])),
     pecas: () => { const r = {}; for (const e of predios.values()) { let m = 0, t = 0; e.obj.traverse(o => { if (o.isMesh) { m++; const g = o.geometry; t += (g.index ? g.index.count : g.attributes.position.count) / 3 * (o.isInstancedMesh ? o.count : 1); } }); const x = r[e.tipo] || (r[e.tipo] = { n: 0, pecas: 0, tri: 0 }); x.n++; x.pecas += m; x.tri += Math.round(t); } let ce = 0; scene.traverse(o => { if (o.isMesh) ce++; }); r._cenaToda = ce; return r; },
     memoria: () => ({ ...renderer.info.memory, desenhos: renderer.info.render.calls, triangulos: renderer.info.render.triangles }),

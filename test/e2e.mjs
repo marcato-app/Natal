@@ -64,6 +64,21 @@ try {
     await p.screenshot({ path: `${TELAS}${nome}-2-construir.png` });
     await p.click('#sheet-construir [data-fechar]'); await p.waitForTimeout(400);
 
+    // pedidos dos moradores: abre o quadro e entrega um
+    await p.click('[data-abrir="pedidos"]'); await p.waitForTimeout(600);
+    check('quadro de pedidos abre com pedidos', await p.isVisible('#sheet-pedidos') && (await p.locator('#pd-lista .pedido').count()) >= 3);
+    await p.screenshot({ path: `${TELAS}${nome}-2b-pedidos.png` });
+    await p.click('#sheet-pedidos [data-fechar]'); await p.waitForTimeout(300);
+    const entregue = await p.evaluate(() => { const v = window.__teste.estado(); const ped = v.pedidos.find(x => x.chega <= Date.now() && Object.entries(x.pede).every(([r, q]) => v[r] - q >= (r === 'doces' ? 45 : 100))); return ped ? window.__teste.agir({ tipo: 'pedido', id: ped.id }).ok : 'nenhum possível'; });
+    check('entrega um pedido', entregue === true || entregue === 'nenhum possível', entregue);
+    // evento e coleção
+    await p.click('#evento-chip'); await p.waitForTimeout(600);
+    check('painel do evento abre com a trilha', await p.isVisible('#sheet-evento') && (await p.locator('#ev-trilha .passo').count()) === 7);
+    await p.screenshot({ path: `${TELAS}${nome}-2c-evento.png` });
+    await p.evaluate(() => document.querySelector('#sheet-evento [data-abrir="colecao"]').click()); await p.waitForTimeout(600);
+    check('coleção abre com as séries', await p.isVisible('#sheet-colecao') && (await p.locator('#cl-lista .serie').count()) === 4);
+    await p.click('#sheet-colecao [data-fechar]'); await p.waitForTimeout(300);
+
     // painel da fábrica
     await p.evaluate(() => window.__teste.selecionarTipo('fabrica')); await p.waitForTimeout(800);
     check('painel do prédio abre', await p.isVisible('#sheet-predio'));

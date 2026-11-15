@@ -11,6 +11,7 @@ import {
   presenteDeHoje, missoesAtivas, PRESENTE_DIARIO, ADVENTO, diaDe,
   emConstrucao, obrasDeConstrutor, construtores, custoAcelerar, TEMPO_ENFEITE, CUSTO_CONSTRUTOR, MAX_CONSTRUTORES, ESTRELAS_POR_NIVEL,
   nivelDe, progressoNivel, alegriaAoConstruir,
+  pedidoChegou, eventoAtual, meuEvento, TRILHA, PONTOS, COLECAO, qtdPeca, serieCompleta,
 } from './regras.js';
 import { criarCena } from './cena.js';
 import * as som from './audio.js';
@@ -178,12 +179,23 @@ function desenharHud() {
     if (ultimos[r] !== undefined && v > ultimos[r]) { el.parentElement.classList.remove('pulse'); void el.offsetWidth; el.parentElement.classList.add('pulse'); }
     ultimos[r] = v; el.textContent = fmt(v);
   }
-  $('nav-duendes').textContent = `Duendes ${estado.duendes.length}/${moradia(estado)}`;
+  $('nav-duendes').textContent = 'Duendes';
+  $('nav-duendes').title = `${estado.duendes.length} de ${moradia(estado)} duendes`;
   const ativas = missoesAtivas(estado), prontaM = ativas.find(m => m.progresso(estado) >= m.meta);
   const m1 = prontaM || ativas[0];
   $('missao-texto').textContent = m1 ? (prontaM ? `Prêmio pronto: ${m1.texto}` : `${m1.texto} · ${Math.min(m1.progresso(estado), m1.meta)}/${m1.meta}`) : 'Todas as missões feitas!';
   $('missao-ponto').hidden = !prontaM;
   $('presente-ponto').hidden = !presenteDeHoje(estado, agora());
+  const t = agora();
+  $('pedidos-ponto').hidden = !(estado.pedidos || []).some(p => pedidoChegou(p, t) && podePagar(estado, p.pede));
+  const ev = eventoAtual(t), me = meuEvento(estado, t), prox = TRILHA.find((x, i) => !me.premios.includes(i));
+  $('evento-texto').textContent = `${ev.nome} · ${faltaTexto(ev.fim - t)}`;
+  $('evento-barra').style.width = prox ? `${Math.min(100, me.pontos / prox.pontos * 100)}%` : '100%';
+  $('evento-ponto').hidden = !TRILHA.some((x, i) => me.pontos >= x.pontos && !me.premios.includes(i));
+}
+function faltaTexto(ms) {
+  const h = Math.max(0, Math.floor(ms / 3600000)), d = Math.floor(h / 24);
+  return d ? `${d}d ${h % 24}h` : h ? `${h}h ${Math.floor(ms / 60000) % 60}min` : `${Math.max(1, Math.ceil(ms / 60000))}min`;
 }
 
 function sincCena() { cena.sincronizar(visitando ? visitando.vila : estado); }
@@ -202,13 +214,16 @@ function desenhar() {
 function abrir(qual) {
   if (colocando || dentro || (visitando && qual)) return;
   painel = qual;
-  for (const p of ['construir', 'predio', 'duendes', 'amigos', 'missoes', 'presente', 'ajustes', 'boasvindas', 'loja', 'terreno']) $('sheet-' + p).hidden = p !== qual;
+  for (const p of ['construir', 'predio', 'duendes', 'amigos', 'missoes', 'presente', 'ajustes', 'boasvindas', 'loja', 'terreno', 'pedidos', 'evento', 'colecao']) $('sheet-' + p).hidden = p !== qual;
   $('nav').hidden = !!qual;
   if (qual !== 'predio') { selecionado = null; cena.setSelecionado(null); }
   if (qual === 'construir') { desenharAbas(); desenharCards(); }
   if (qual === 'duendes') desenharDuendes();
   if (qual === 'missoes') desenharMissoes();
   if (qual === 'presente') desenharPresente();
+  if (qual === 'pedidos') desenharPedidos();
+  if (qual === 'evento') desenharEvento();
+  if (qual === 'colecao') desenharColecao();
   if (qual === 'loja') desenharLoja();
   if (qual === 'amigos') abrirAmigos();
   if (qual === 'terreno') desenharTerreno();
@@ -255,13 +270,13 @@ $('construtores').addEventListener('click', (e) => {
 function desenharCards() {
   desenharConstrutores();
   const nivel = nivelDe(estado.alegria);
-  $('cards').innerHTML = Object.entries(TIPOS).filter(([, t]) => t.cat === abaConstrucao).map(([k, t]) => {
+  $('cards').innerHTML = Object.entries(TIPOS).filter(([k, t]) => t.cat === abaConstrucao && (!t.exclusivo || (estado.exclusivos || {})[k] > 0)).map(([k, t]) => {
     const travado = nivel < t.nivel;
     return `<button type="button" class="card ${travado ? 'locked' : ''}" data-tipo="${k}" ${travado ? 'aria-disabled="true"' : ''}>
       <img src="${thumbs[k] || ''}" alt="">
       ${travado ? `<span class="lock">${svg('i-cadeado')}Nível ${t.nivel}</span>` : ''}
       <b>${t.nome}</b>
-      <span class="cost">${travado ? 'Bloqueado' : custoHtml(t.custo)}</span>
+      <span class="cost">${travado ? 'Bloqueado' : t.exclusivo ? `Prêmio do evento ×${estado.exclusivos[k]}` : custoHtml(t.custo)}</span>
       ${!travado && t.tempo ? `<span class="tempo">${svg('i-relogio')}${tempoTexto(t.tempo)}</span>` : ''}
     </button>`;
   }).join('');
@@ -270,6 +285,7 @@ $('cards').addEventListener('click', (e) => {
   const c = e.target.closest('[data-tipo]'); if (!c) return;
   const tipo = c.dataset.tipo, t = TIPOS[tipo];
   if (nivelDe(estado.alegria) < t.nivel) { toast(`${t.nome} libera no nível ${t.nivel}`); return; }
+  if (t.exclusivo && !((estado.exclusivos || {})[tipo] > 0)) { toast('Essa decoração só sai no evento'); return; }
   if (!podePagar(estado, t.custo)) { toast('Recursos insuficientes'); return; }
   comecarColocar({ tipo });
 });
@@ -416,9 +432,110 @@ $('ms-lista').addEventListener('click', (e) => {
   if (b) { const r = agir({ tipo: 'missao', id: b.dataset.missao }); if (r.ok) { som.tocar('presente'); toast(`Missão cumprida! ${Object.entries(r.ganho).map(([k, q]) => `+${fmt(q)} ${k}`).join(' ')}`); desenharMissoes(); } return; }
   const ir = e.target.closest('[data-ir]'); if (!ir) return;
   const f = ir.dataset.ir;
-  if (f === 'construir' || f === 'duendes') abrir(f);
+  if (['construir', 'duendes', 'pedidos', 'colecao', 'evento'].includes(f)) abrir(f);
   else if (estado.predios.some(p => p.tipo === f)) selecionar(estado.predios.find(p => p.tipo === f).id);
   else { abrir('construir'); toast(`Construa: ${TIPOS[f]?.nome || f}`); }
+});
+
+// Avisos no celular (só no app): agendados quando o jogo vai pro fundo, cancelados ao voltar.
+const AVISOS = [1, 2, 3].map(id => ({ id }));
+async function pedirAvisos() {
+  const LN = plugin('LocalNotifications'); if (!LN || ls.get('natal.avisos')) return;
+  ls.set('natal.avisos', '1');
+  try { await LN.requestPermissions(); } catch { /* recusou */ }
+}
+async function cancelarAvisos() { try { await plugin('LocalNotifications')?.cancel({ notifications: AVISOS }); } catch { /* ok */ } }
+async function agendarAvisos() {
+  const LN = plugin('LocalNotifications'); if (!LN || !estado) return;
+  try {
+    if ((await LN.checkPermissions()).display !== 'granted') return;
+    await LN.cancel({ notifications: AVISOS });
+    const t = agora(), local = (ms) => new Date(ms - offset), avisos = [];
+    let cheio = Infinity, nome = '';
+    for (const p of estado.predios) {
+      const pr = TIPOS[p.tipo].prod; if (!pr || emConstrucao(p)) continue;
+      const n = Math.min(duendesEm(estado, p.id), pr.vagas); if (!n) continue;
+      const falta = (ESTOQUE_MAX - (p.prog || 0)) * pr.ciclo * pr.vagas / n;
+      if (falta > 120 && t + falta * 1000 < cheio) { cheio = t + falta * 1000; nome = TIPOS[p.tipo].nome; }
+    }
+    if (isFinite(cheio)) avisos.push({ id: 1, title: `${nome}: estoque cheio!`, body: 'Os duendes pararam de produzir. Venha coletar 🎄', schedule: { at: local(cheio) } });
+    const ped = (estado.pedidos || []).filter(p => p.chega > t).sort((a, b) => a.chega - b.chega)[0];
+    if (ped) avisos.push({ id: 2, title: `${ped.quem} fez um pedido`, body: 'Tem pedido novo no quadro da vila.', schedule: { at: local(ped.chega + 5000) } });
+    const brt = new Date(t - 3 * 3600000); let dez = Date.UTC(brt.getUTCFullYear(), brt.getUTCMonth(), brt.getUTCDate(), 13);
+    if (dez - t < 2 * 3600000) dez += 86400000;
+    avisos.push({ id: 3, title: 'Seu presente do dia chegou! 🎁', body: 'Volte todo dia pra presentes maiores.', schedule: { at: local(dez) } });
+    await LN.schedule({ notifications: avisos });
+  } catch { /* sem avisos */ }
+}
+
+// Pedidos dos moradores
+const nomePeca = (chave) => { const [id, i] = chave.split(':'), sr = COLECAO.find(x => x.id === id); return sr ? `${sr.nome}: ${sr.pecas[i]}` : chave; };
+const ganhoTexto = (g) => Object.entries(g).filter(([k]) => ICONE[k]).map(([k, q]) => `+${fmt(q)} ${k}`).join(' ');
+function desenharPedidos() {
+  const t = agora(), lista = estado.pedidos || [];
+  const chave = JSON.stringify([lista.map(p => [p.id, pedidoChegou(p, t) ? 0 : Math.ceil((p.chega - t) / 1000)]), Math.floor(estado.moedas), Math.floor(estado.doces)]);
+  if (chave === desenharPedidos.chave) return;
+  desenharPedidos.chave = chave;
+  $('pd-lista').innerHTML = lista.map(p => {
+    const chegou = pedidoChegou(p, t), da = podePagar(estado, p.pede);
+    const quer = Object.entries(p.pede).map(([r, q]) => `<span class="${(estado[r] || 0) < q ? 'falta' : ''}">${svg(ICONE[r])}${fmt(q)}</span>`).join('');
+    const paga = Object.entries(p.paga).map(([r, q]) => `<span>${svg(ICONE[r])}${fmt(q)}</span>`).join('') + (p.peca ? `<span class="peca-tag">${svg('i-bola')}peça rara</span>` : '');
+    if (!chegou) return `<div class="item-row pedido esperando"><div class="quem">?</div><div class="item-info"><b>Novo pedido a caminho</b><small>Chega em ${tempoTexto((p.chega - t) / 1000)}</small></div></div>`;
+    return `<div class="item-row pedido"><div class="quem">${p.quem[0]}</div><div class="item-info"><b>${p.quem}</b>
+      <div class="linha"><span class="rotulo">quer</span>${quer}</div><div class="linha"><span class="rotulo">paga</span>${paga}</div></div>
+      <div class="botoes"><button type="button" class="trocar" data-trocar="${p.id}" aria-label="Trocar pedido">${svg('i-trocar')}</button>
+      <button type="button" class="buy ${da ? '' : 'caro'}" data-entregar="${p.id}">Entregar</button></div></div>`;
+  }).join('');
+}
+$('pd-lista').addEventListener('click', (e) => {
+  const en = e.target.closest('[data-entregar]'), tr = e.target.closest('[data-trocar]');
+  if (en) {
+    const ped = estado.pedidos.find(p => p.id === en.dataset.entregar);
+    const r = agir({ tipo: 'pedido', id: en.dataset.entregar });
+    if (r.ok) { som.tocar('presente'); vibrar(); pedirAvisos(); toast(`${ped.quem} agradece! ${ganhoTexto(r.ganho)} · +${r.pontos} pontos${r.peca ? ` · Peça rara: ${nomePeca(r.peca)}` : ''}`); }
+  } else if (tr) {
+    if (!confirm('Trocar esse pedido? Um novo chega em 15 minutos.')) return;
+    agir({ tipo: 'trocarPedido', id: tr.dataset.trocar });
+  } else return;
+  desenharPedidos.chave = null; desenharPedidos();
+});
+
+// Evento da semana
+function desenharEvento() {
+  const t = agora(), ev = eventoAtual(t), me = meuEvento(estado, t);
+  $('ev-nome').textContent = ev.nome;
+  $('ev-sub').textContent = `${ev.texto} · termina em ${faltaTexto(ev.fim - t)}`;
+  $('ev-pontos').textContent = fmt(me.pontos);
+  $('ev-como').innerHTML = `Como ganhar pontos:<br>pedido entregue <b>${PONTOS.pedido}</b> · coleta <b>${PONTOS.coleta}</b> · visita do Papai Noel <b>${PONTOS.aluguel}</b> · presente do dia <b>${PONTOS.presente}</b>`;
+  $('ev-trilha').innerHTML = TRILHA.map((x, i) => {
+    const pego = me.premios.includes(i), pode = me.pontos >= x.pontos && !pego;
+    const pr = Object.entries(x.premio).map(([r, q]) => r === 'peca' ? `<span class="peca-tag">${svg('i-bola')}peça rara</span>` : r === 'exclusivo' ? `<span class="peca-tag">${svg('i-estrela')}${TIPOS[ev.exclusivo].nome}</span>` : `<span>${svg(ICONE[r])}${fmt(q)}</span>`).join(' ');
+    return `<div class="item-row passo ${pego ? 'feito' : ''}"><div class="item-info"><b>${fmt(x.pontos)} pontos</b><div class="bar"><i style="width:${Math.min(100, me.pontos / x.pontos * 100)}%"></i></div><small class="linha">${pr}</small></div>
+      ${pego ? `<span class="completo">${svg('i-ok')}Pego</span>` : `<button type="button" class="buy ${pode ? '' : 'caro'}" data-premio="${i}" ${pode ? '' : 'disabled'}>Pegar</button>`}</div>`;
+  }).join('');
+}
+$('ev-trilha').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-premio]'); if (!b) return;
+  const r = agir({ tipo: 'eventoPremio', n: Number(b.dataset.premio) });
+  if (!r.ok) return;
+  som.tocar('nivel');
+  toast(['Prêmio do evento!', ganhoTexto(r.ganho), r.ganho.peca ? `Peça rara: ${nomePeca(r.ganho.peca)}` : '', r.ganho.exclusivo ? `Ganhou: ${TIPOS[r.ganho.exclusivo].nome}! Está no menu Construir.` : ''].filter(Boolean).join(' · '));
+  desenharEvento();
+});
+
+// Coleção
+function desenharColecao() {
+  $('cl-lista').innerHTML = COLECAO.map(sr => {
+    const completa = serieCompleta(estado, sr);
+    const pecas = sr.pecas.map((n, i) => { const q = qtdPeca(estado, `${sr.id}:${i}`); return `<span class="pc ${q ? 'tem' : ''}">${n}${q > 1 ? ` ×${q}` : ''}</span>`; }).join('');
+    return `<div class="item-row serie"><div class="item-info"><b>${sr.nome}</b><div class="pecas">${pecas}</div></div>
+      <button type="button" class="buy ${completa ? '' : 'caro'}" data-serie="${sr.id}" ${completa ? '' : 'disabled'}>Trocar<span class="cost">${premioHtml(sr.premio)}</span></button></div>`;
+  }).join('');
+}
+$('cl-lista').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-serie]'); if (!b) return;
+  const r = agir({ tipo: 'colecao', serie: b.dataset.serie });
+  if (r.ok) { som.tocar('nivel'); toast(`Série completa! ${ganhoTexto(r.ganho)}`); desenharColecao(); }
 });
 
 // Presente do dia / Calendário do Advento
@@ -488,7 +605,46 @@ async function abrirAmigos() {
   $('am-meu-codigo').textContent = eu.codigo;
   await carregarAmigos();
 }
+// Ranking da semana (pontos do evento). Guarda quem estava atrás de mim pra avisar quando passarem.
+async function carregarRanking(avisar = false) {
+  let r; try { r = await api('GET', '/api/ranking'); } catch { return; }
+  const lista = r.ranking, eu = lista.findIndex(x => x.eu);
+  if (lista.length > 1) {
+    $('rk-titulo').textContent = `Ranking da semana · ${r.evento.nome}`;
+    $('rk-lista').innerHTML = lista.map((a, i) => `<div class="item-row rk ${a.eu ? 'eu' : ''} ${i === 0 ? 'top1' : ''}"><span class="pos">${i + 1}º</span><div class="item-info"><b>${a.eu ? 'Você' : esc(a.nome)}</b><small>Nível ${a.nivel}</small></div><div class="pts">${fmt(a.pontos)}<small>pontos</small></div></div>`).join('');
+  } else { $('rk-titulo').textContent = 'Ranking da semana'; $('rk-lista').innerHTML = '<p class="info">Convide amigos pra competir no evento da semana!</p>'; }
+  const atras = lista.slice(eu + 1).map(x => x.id), antes = JSON.parse(ls.get('natal.ranking') || '[]');
+  const passaram = lista.slice(0, eu).filter(x => antes.includes(x.id));
+  if (avisar && passaram.length) toast(`${passaram.map(x => x.nome).join(', ')} te passou no ranking do evento! Bora entregar pedidos.`);
+  ls.set('natal.ranking', JSON.stringify(atras));
+}
+
+// Cartão-postal: foto da vila + nome, nível e convite, pra mandar no WhatsApp
+async function cartaoPostal() {
+  if (!eu) { try { eu = await api('GET', '/api/eu'); } catch { /* sem conta: sai sem convite */ } }
+  fechar(); await new Promise(r => setTimeout(r, 450));
+  const foto = new Image(); foto.src = cena.foto(); await foto.decode();
+  const W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
+  const g = c.getContext('2d'), k = Math.max(W / foto.width, H / foto.height);
+  g.drawImage(foto, (W - foto.width * k) / 2, (H - foto.height * k) / 2, foto.width * k, foto.height * k);
+  const grad = g.createLinearGradient(0, H * 0.62, 0, H); grad.addColorStop(0, 'rgba(11,20,48,0)'); grad.addColorStop(1, 'rgba(11,20,48,.92)');
+  g.fillStyle = grad; g.fillRect(0, 0, W, H);
+  g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 14; g.strokeRect(28, 28, W - 56, H - 56);
+  g.fillStyle = '#ffd36e'; g.font = '700 46px Fredoka, sans-serif'; g.fillText('Feliz Natal da', 72, H - 250);
+  g.fillStyle = '#fff'; g.font = '700 84px Fredoka, sans-serif'; g.fillText(`Vila de ${(eu && eu.nome) || 'um vizinho'}`.slice(0, 26), 72, H - 160);
+  g.font = '700 38px Nunito, sans-serif'; g.fillStyle = 'rgba(255,255,255,.85)';
+  g.fillText(`Nível ${nivelDe(estado.alegria)} · ${estado.predios.length} construções${eu ? ` · código ${eu.codigo}` : ''}`, 72, H - 90);
+  const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.9));
+  const arq = new File([blob], 'vila-de-natal.jpg', { type: 'image/jpeg' });
+  const texto = eu ? `Olha minha Vila de Natal! 🎄 Vem ser meu vizinho: ${SITE}/?amigo=${eu.codigo}` : 'Olha minha Vila de Natal! 🎄';
+  try { if (navigator.canShare && navigator.canShare({ files: [arq] })) { await navigator.share({ files: [arq], text: texto, title: 'Vila de Natal' }); return; } } catch { return; }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'vila-de-natal.jpg'; a.click();
+  toast('Cartão-postal salvo! Mande no WhatsApp junto com o convite.');
+}
+$('am-postal').addEventListener('click', () => cartaoPostal().catch(() => toast('Não deu pra gerar o cartão agora')));
+
 async function carregarAmigos() {
+  carregarRanking();
   try { amigos = (await api('GET', '/api/amigos')).amigos; } catch { amigos = []; }
   const pend = eu?.presentesPendentes || 0;
   $('am-presentes').innerHTML = pend ? `<div class="melhoria"><div class="item-info"><b>${pend} presente${pend > 1 ? 's' : ''} de amigos!</b><small>Moedas e doces esperando por você</small></div><button type="button" class="buy" id="am-abrir-presentes">Abrir</button></div>` : '';
@@ -925,6 +1081,7 @@ async function iniciar() {
   const convite = new URLSearchParams(location.search).get('amigo');
   if (convite && online) { adicionarAmigo(convite); history.replaceState(null, '', location.pathname); }
   if (fila.length) agendarEnvio(500);
+  if (online) setTimeout(() => carregarRanking(true), 4000);
 
   // o tempo passa: produção anda e os balões aparecem
   setInterval(() => {
@@ -937,6 +1094,7 @@ async function iniciar() {
     desenharHud();
     sincBaloes();
     if (painel === 'predio') desenharPredio();
+    if (painel === 'pedidos') desenharPedidos();
   }, 500);
   // de tempos em tempos busca a vila oficial (ex: aberta em outro aparelho)
   setInterval(async () => {
@@ -955,7 +1113,7 @@ async function iniciar() {
   };
   setTimeout(chamarNoel, 6000);
   setInterval(chamarNoel, 18000);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') enviar(); });
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { enviar(); agendarAvisos(); } else cancelarAvisos(); });
 }
 // atalho pros testes automáticos (só no servidor local)
 if (location.hostname === 'localhost') window.__teste = { selecionarTipo: (t) => selecionar(estado.predios.find(p => p.tipo === t).id), memoria: () => cena.memoria(), pecas: () => cena.pecas(), prontos: () => cena.prontos(), noel: () => { const c = estado.predios.find(p => p.tipo === 'casa'); cena.papaiNoel([{ id: c.id, pos: cena.chamineDe(c.id) }], (id) => coletar(id), { perto: true }); }, focar: (t) => cena.focar(estado.predios.find(p => p.tipo === t).id), agir: (a) => agir(a), estado: () => estado, cena: () => cena };

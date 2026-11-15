@@ -1,5 +1,5 @@
 import {
-  novaVila, aplicar, avancar, MAX_ACOES, diaDe, nivelDe,
+  novaVila, aplicar, avancar, MAX_ACOES, diaDe, nivelDe, meuEvento, eventoAtual,
   receberAjuda, darRecompensa, PRESENTE_AMIGO, RECOMPENSA_AJUDANTE,
 } from '../assets/js/regras.js';
 
@@ -203,6 +203,22 @@ route('GET', '/api/amigos', async (request, env) => {
     FROM amizades a JOIN jogadores p ON p.id = a.b JOIN vilas v ON v.jogador_id = p.id
     WHERE a.a = ?1 ORDER BY p.visto_em DESC LIMIT 200`).bind(j.id, dia).all();
   return json({ amigos: results.map(r => ({ id: r.id, nome: r.nome || 'Vizinho', codigo: r.codigo, vistoEm: r.visto_em, nivel: nivelDe(JSON.parse(r.estado).alegria), podePresentear: !r.presenteou, podeAjudar: !r.ajudou })) });
+});
+
+// Ranking: eu + amigos, pelos pontos do evento da semana (e alegria total pra desempate).
+route('GET', '/api/ranking', async (request, env) => {
+  const j = await jogadorDoToken(request, env);
+  if (!j) return unauthorized();
+  const agora = relogio();
+  const { results } = await env.DB.prepare(`
+    SELECT p.id, p.nome, v.estado FROM jogadores p JOIN vilas v ON v.jogador_id = p.id
+    WHERE p.id = ?1 OR p.id IN (SELECT b FROM amizades WHERE a = ?1) LIMIT 201`).bind(j.id).all();
+  const lista = results.map(r => {
+    const vila = JSON.parse(r.estado);
+    return { id: r.id, nome: r.nome || 'Vizinho', eu: r.id === j.id, nivel: nivelDe(vila.alegria), alegria: Math.floor(vila.alegria), pontos: meuEvento(vila, agora).pontos };
+  }).sort((a, b) => b.pontos - a.pontos || b.alegria - a.alegria);
+  const ev = eventoAtual(agora);
+  return json({ evento: { nome: ev.nome, fim: ev.fim }, ranking: lista });
 });
 
 route('POST', '/api/amigos', async (request, env) => {

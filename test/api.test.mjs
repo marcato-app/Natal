@@ -112,6 +112,9 @@ check('mais de 50 ações = 400', (await call('POST', '/api/acoes', { token, bod
   const listaB = await call('GET', '/api/amigos', { token: tb });
   check('amizade vale nos dois sentidos', listaB.data.amigos.length === 1 && listaB.data.amigos[0].nome.startsWith('Ana'));
   const idB = add.data.id, idA = listaB.data.amigos[0].id;
+  const rk = await call('GET', '/api/ranking', { token: ta });
+  check('ranking traz eu e o amigo', rk.status === 200 && rk.data.ranking.length === 2 && rk.data.ranking.filter(x => x.eu).length === 1 && rk.data.evento.nome, rk.data);
+  check('ranking pede login', (await call('GET', '/api/ranking')).status === 401);
   check('visita a vila do amigo', (await call('GET', `/api/amigos/${idB}/vila`, { token: ta })).data.vila.predios.length > 3);
   const estranho = await call('POST', '/api/jogador');
   check('não visita quem não é amigo', (await call('GET', `/api/amigos/${idB}/vila`, { token: estranho.data.token })).status === 404);

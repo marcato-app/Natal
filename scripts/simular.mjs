@@ -10,10 +10,12 @@
 import {
   novaVila, aplicar, avancar, cabe, TIPOS, ITENS, TERRENOS, MAPA_MIN, MAPA_MAX, CUSTO_DUENDE, CUSTO_CONSTRUTOR, MAX_CONSTRUTORES,
   nivelDe, prontos, duendesEm, moradia, podePagar, bloqueioItem, nivelItem, missoesAtivas, presenteDeHoje, obrasDeConstrutor, construtores, terrenoLivre, aluguelDe,
+  pedidoChegou, meuEvento, TRILHA, COLECAO, serieCompleta,
 } from '../assets/js/regras.js';
 
 const DIAS = Number(process.argv[2] || 45), SESSOES = Number(process.argv[3] || 4), MIN = Number(process.argv[4] || 5);
 const HORAS = [8, 12.5, 19, 22.5].slice(0, SESSOES);
+const SEM_PEDIDOS = process.argv.includes('--sem-pedidos');
 const INICIO = Date.parse('2026-11-16T03:00:00Z'); // meia-noite em Brasília
 const v = novaVila(INICIO);
 const marcos = {}, log = [];
@@ -57,12 +59,20 @@ function vez(agora) {
   if (!lugar(4)) { const t = TERRENOS.filter(t => terrenoLivre(v, t) && t.nivel <= nivel && podePagar(v, t.custo)).sort((a, b) => a.custo.moedas - b.custo.moedas)[0]; if (t) tenta({ tipo: 'terreno', id: t.id }); }
   // enfeites e móveis (mantém uma reserva pra obras)
   const reserva = 300 + nivel * 150;
+  // pedidos dos moradores (se não comer a reserva), prêmios do evento e coleção
+  if (!SEM_PEDIDOS) {
+    for (const ped of [...(v.pedidos || [])]) if (pedidoChegou(ped, agora) && Object.entries(ped.pede).every(([r, q]) => v[r] - q >= (r === 'moedas' ? reserva : 40))) tenta({ tipo: 'pedido', id: ped.id });
+    const ev = meuEvento(v, agora);
+    TRILHA.forEach((t, n) => { if (ev.pontos >= t.pontos && !ev.premios.includes(n)) tenta({ tipo: 'eventoPremio', n }); });
+    for (const sr of COLECAO) if (serieCompleta(v, sr)) tenta({ tipo: 'colecao', serie: sr.id });
+    for (const [k, q] of Object.entries(v.exclusivos || {})) if (q > 0) { const l = lugar(TIPOS[k].tam); if (l) tenta({ tipo: 'construir', predio: k, ...l }); }
+  }
   const itens = [];
   for (const p of v.predios) for (const k of Object.keys(ITENS[p.tipo] || {})) if (!bloqueioItem(v, p, k)) { const c = ITENS[p.tipo][k].custos[nivelItem(p, k)]; itens.push({ p, k, c }); }
   itens.sort((a, b) => (a.c.moedas || 0) - (b.c.moedas || 0));
   for (const { p, k, c } of itens) if ((v.moedas - (c.moedas || 0)) > reserva && podePagar(v, c)) tenta({ tipo: 'item', id: p.id, item: k });
   // decorações sem obra (alegria barata)
-  const decos = Object.entries(TIPOS).filter(([k, t]) => t.cat === 'decoracao' && t.nivel <= nivel && (META[k] ? qtd(k) < META[k] : qtd(k) < 4)).sort(([, a], [, b]) => b.alegria / (b.custo.moedas || 1) - a.alegria / (a.custo.moedas || 1));
+  const decos = Object.entries(TIPOS).filter(([k, t]) => t.cat === 'decoracao' && !t.exclusivo && t.nivel <= nivel && (META[k] ? qtd(k) < META[k] : qtd(k) < 4)).sort(([, a], [, b]) => b.alegria / (b.custo.moedas || 1) - a.alegria / (a.custo.moedas || 1));
   for (const [k, t] of decos) if (v.moedas - (t.custo.moedas || 0) > reserva && podePagar(v, t.custo)) { const l = lugar(t.tam); if (l) tenta({ tipo: 'construir', predio: k, ...l }); }
 }
 
@@ -74,7 +84,7 @@ for (let dia = 0; dia < DIAS; dia++) {
     for (let k = 1; k <= n; k++) if (!(k in marcos)) marcos[k] = (dia + 1) + (h / 24);
   }
   avancar(v, INICIO + (dia + 1) * 86400000);
-  log.push(`dia ${String(dia + 1).padStart(2)}  nível ${String(nivelDe(v.alegria)).padStart(2)}  alegria ${String(v.alegria).padStart(6)}  moedas ${String(Math.floor(v.moedas)).padStart(7)}  doces ${String(Math.floor(v.doces)).padStart(5)}  estrelas ${String(v.estrelas).padStart(4)}  prédios ${v.predios.length}  duendes ${v.duendes.length}  terrenos ${(v.terrenos || []).length}`);
+  log.push(`dia ${String(dia + 1).padStart(2)}  nível ${String(nivelDe(v.alegria)).padStart(2)}  alegria ${String(v.alegria).padStart(6)}  moedas ${String(Math.floor(v.moedas)).padStart(7)}  doces ${String(Math.floor(v.doces)).padStart(5)}  estrelas ${String(v.estrelas).padStart(4)}  prédios ${v.predios.length}  duendes ${v.duendes.length}  terrenos ${(v.terrenos || []).length}  pedidos ${(v.stats || {}).pedidos || 0}  séries ${(v.stats || {}).series || 0}`);
 }
 if (process.argv.includes('--dias')) console.log(log.join('\n'));
 console.log('Dia em que chega a cada nível (jogando ' + SESSOES + 'x por dia, ' + MIN + ' min):');
