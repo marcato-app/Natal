@@ -13,7 +13,8 @@ nível com a alegria e libera prédios novos. A produção continua com o jogo f
 
 Cloudflare Worker (`src/index.js`) + D1 (`natal-db`). Sem build step: o
 `index.html` e a pasta `assets/` são servidos como estão pelos assets do Worker. O
-Three.js (0.160.0) vem do jsDelivr pelo importmap do `index.html`.
+Three.js (0.160.0) e as fontes ficam dentro do projeto (`assets/vendor/`, `assets/fonts/`),
+então nada vem de CDN; `sw.js` guarda tudo no aparelho pra abrir offline.
 
 - `assets/js/regras.js` — **as regras do jogo**: catálogo de prédios (`TIPOS`),
   mapa e ruas, níveis, e `aplicar(vila, acao, agora)` com todas as ações. É puro (sem
