@@ -6,12 +6,14 @@ import {
   TIPOS, CATEGORIAS, CUSTO_DUENDE, ESTOQUE_MAX, ITENS,
   novaVila, aplicar, avancar, cabe, predio, duendesEm, moradia, moradiaDe, prontos, podePagar,
   nivelItem, bloqueioItem, aluguelDe, ALUGUEL_CICLO, PRESENTE_DOCES,
+  ANUNCIO_ESTRELAS, ANUNCIO_ADIANTA, ANUNCIOS_POR_DIA, anunciosHoje,
   presenteDeHoje, missoesAtivas, PRESENTE_DIARIO, ADVENTO, diaDe,
   emConstrucao, obrasDeConstrutor, construtores, custoAcelerar, TEMPO_ENFEITE, CUSTO_CONSTRUTOR, MAX_CONSTRUTORES, ESTRELAS_POR_NIVEL,
   nivelDe, progressoNivel, alegriaAoConstruir,
 } from './regras.js';
 import { criarCena } from './cena.js';
 import * as som from './audio.js';
+import * as anuncios from './anuncios.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.floor(n).toLocaleString('pt-BR');
@@ -198,13 +200,14 @@ function desenhar() {
 function abrir(qual) {
   if (colocando || dentro) return;
   painel = qual;
-  for (const p of ['construir', 'predio', 'duendes', 'amigos', 'missoes', 'presente', 'ajustes', 'boasvindas']) $('sheet-' + p).hidden = p !== qual;
+  for (const p of ['construir', 'predio', 'duendes', 'amigos', 'missoes', 'presente', 'ajustes', 'boasvindas', 'loja']) $('sheet-' + p).hidden = p !== qual;
   $('nav').hidden = !!qual;
   if (qual !== 'predio') { selecionado = null; cena.setSelecionado(null); }
   if (qual === 'construir') { desenharAbas(); desenharCards(); }
   if (qual === 'duendes') desenharDuendes();
   if (qual === 'missoes') desenharMissoes();
   if (qual === 'presente') desenharPresente();
+  if (qual === 'loja') desenharLoja();
   if (qual === 'ajustes') { const pf = som.preferencias(); $('aj-musica').checked = pf.musica; $('aj-sons').checked = pf.sons; $('aj-qualidade').value = String(cena.qualidade()); }
   if (qual === 'predio') { vendaPendente = false; desenharPredio.chave = null; desenharPredio(); }
   deslocarCena();
@@ -361,6 +364,7 @@ $('pd-corpo').addEventListener('click', (e) => {
   const it = e.target.closest('[data-item]'); if (it) { comprarItem(selecionado, it.dataset.item); return; }
   const ac = e.target.closest('[data-acao]');
   if (ac && ac.dataset.acao === 'melhorar') { const r = agir({ tipo: 'melhorar', id: selecionado }); if (r.ok) toast('Os construtores começaram a aumentar a casa!'); return; }
+  if (ac && ac.dataset.acao === 'video-obra') { verVideo('obra', selecionado); return; }
   if (ac && ac.dataset.acao === 'acelerar') { const r = agir({ tipo: 'acelerar', id: selecionado }); if (r.ok) { toast(`Pronto! −${r.custo} estrela${r.custo > 1 ? 's' : ''}`); desenharPredio.chave = null; desenharPredio(); } return; }
   if (ac && ac.dataset.acao === 'entrar') { entrar(selecionado); return; }
   const tirar = e.target.closest('[data-tirar]'); if (tirar) { agir({ tipo: 'alocar', duende: tirar.dataset.tirar, predio: null }); return; }
@@ -386,7 +390,8 @@ function blocoObra(p) {
   const custo = custoAcelerar(rest);
   return `<div class="prod"><div class="row"><b>${nome}</b><span class="timer">${tempoTexto(rest)}</span></div>
     <div class="bar"><i style="width:${Math.min(100, (1 - rest / Math.max(1, total)) * 100)}%"></i></div></div>
-    <button type="button" class="cta gold largo" data-acao="acelerar" ${(estado.estrelas || 0) >= custo ? '' : 'disabled'}>Terminar agora · ${svg('i-estrela')} ${custo}</button>`;
+    <button type="button" class="cta gold largo" data-acao="acelerar" ${(estado.estrelas || 0) >= custo ? '' : 'disabled'}>Terminar agora · ${svg('i-estrela')} ${custo}</button>
+    ${anuncios.disponivel() && rest > 30 && anunciosHoje(estado, agora()) < ANUNCIOS_POR_DIA ? `<button type="button" class="cta video largo" data-acao="video-obra">Assistir vídeo · −${ANUNCIO_ADIANTA / 60} min</button>` : ''}`;
 }
 
 // Missões
@@ -532,7 +537,31 @@ function desenharDuendes() {
   if (n >= cap) { btn.disabled = true; btn.innerHTML = 'Construa uma casa pra mais duendes'; }
   else { btn.disabled = !podePagar(estado, CUSTO_DUENDE); btn.innerHTML = `Contratar duende · ${svg('i-doces')} ${CUSTO_DUENDE.doces}`; }
 }
-$('btn-estrelas').addEventListener('click', () => toast(`Estrelas mágicas: terminam obras na hora e contratam construtores. Ganhe ${ESTRELAS_POR_NIVEL} a cada nível.`));
+$('btn-estrelas').addEventListener('click', () => abrir('loja'));
+
+// Loja de estrelas: vídeo grátis (anúncio recompensado) e, no app, pacotes pagos.
+const PACOTES = [{ id: 'estrelas_60', qtd: 60, preco: 'R$ 4,90' }, { id: 'estrelas_200', qtd: 200, preco: 'R$ 14,90', destaque: 'Mais popular' }, { id: 'estrelas_600', qtd: 600, preco: 'R$ 39,90', destaque: 'Melhor valor' }];
+function desenharLoja() {
+  const vistos = anunciosHoje(estado, agora()), resta = ANUNCIOS_POR_DIA - vistos;
+  let html = '';
+  if (anuncios.disponivel()) html += `<div class="item-row"><div class="item-info"><b>Vídeo grátis</b><small>Assista um vídeo curto · ${resta} de ${ANUNCIOS_POR_DIA} hoje</small></div><button type="button" class="buy" data-video="estrelas" ${resta > 0 ? '' : 'disabled'}>Assistir<span class="cost"><span>${svg('i-estrela')}+${ANUNCIO_ESTRELAS}</span></span></button></div>`;
+  html += `<p class="info">Você ganha ${ESTRELAS_POR_NIVEL} estrelas a cada nível, nas missões e no presente do dia.</p>`;
+  html += PACOTES.map(p => `<div class="item-row"><div class="item-info"><b>${svg('i-estrela')} ${p.qtd} estrelas</b><small>${p.destaque || 'Pacote'}</small></div><span class="bloq">${p.preco} · em breve</span></div>`).join('');
+  html += `<p class="info">As compras chegam junto com o app na App Store e no Google Play.</p>`;
+  $('lj-itens').innerHTML = html;
+}
+async function verVideo(premio, id) {
+  if (anunciosHoje(estado, agora()) >= ANUNCIOS_POR_DIA) { toast('Chega de vídeos por hoje. Volte amanhã!'); return; }
+  const ok = await anuncios.assistir();
+  if (!ok) { toast('O vídeo não terminou, então não teve prêmio.'); return; }
+  const r = agir({ tipo: 'anuncio', premio, id });
+  if (!r.ok) return;
+  som.tocar('presente');
+  toast(premio === 'estrelas' ? `+${ANUNCIO_ESTRELAS} estrelas!` : `Obra adiantada em ${ANUNCIO_ADIANTA / 60} minutos!`);
+  if (painel === 'loja') desenharLoja();
+  if (painel === 'predio') { desenharPredio.chave = null; desenharPredio(); }
+}
+$('lj-itens').addEventListener('click', (e) => { const b = e.target.closest('[data-video]'); if (b) verVideo('estrelas'); });
 $('dd-lista').addEventListener('click', (e) => { const b = e.target.closest('[data-ver]'); if (b) selecionar(b.dataset.ver); });
 $('dd-contratar').addEventListener('click', () => {
   const r = agir({ tipo: 'contratar' });
@@ -732,6 +761,7 @@ async function iniciar() {
     navigator.storage?.persist?.().catch(() => {});
   }
   document.addEventListener('pointerdown', () => som.iniciar(), { once: true });
+  anuncios.iniciar();
   document.addEventListener('click', (e) => { if (e.target.closest('button')) som.tocar('clique'); });
   let viu = null; try { viu = localStorage.getItem('natal.boasvindas'); } catch { /* ok */ }
   if (!viu) abrir('boasvindas');

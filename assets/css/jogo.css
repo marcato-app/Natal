@@ -145,6 +145,11 @@ button.pill { border: 1px solid var(--line); color: var(--snow); cursor: pointer
 .passos { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 1.4; color: var(--muted); }
 .passos b { color: var(--snow); }
 
+.video-teste { position: fixed; inset: 0; z-index: 20; background: rgba(5,10,25,.92); display: grid; place-items: center; text-align: center; padding: 24px; }
+.video-teste div { display: flex; flex-direction: column; gap: 10px; font-weight: 800; color: var(--muted); }
+.video-teste b { font: 700 24px/1.2 var(--display); color: var(--snow); }
+.cta.video { background: rgba(255,255,255,.1); color: var(--snow); box-shadow: none; border: 1px solid var(--line); }
+
 /* itens (enfeites, fachada, móveis) */
 .secao { margin: 4px 0 -4px; font: 600 15px/1.2 var(--display); color: var(--muted); }
 .itens { display: flex; flex-direction: column; gap: 6px; }
@@ -152,6 +157,7 @@ button.pill { border: 1px solid var(--line); color: var(--snow); cursor: pointer
 .item-row.flash { background: rgba(255, 201, 77, .28); }
 .item-info { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .item-info b { font: 600 15px/1.15 var(--display); }
+.item-info b svg { width: 18px; height: 18px; vertical-align: -3px; }
 .item-info small { font-size: 12px; font-weight: 800; color: var(--muted); }
 .dots { display: flex; gap: 4px; }
 .dots i { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--muted); }

@@ -1,10 +1,10 @@
 // Service worker: guarda o jogo no aparelho pra abrir sem internet.
 // Arquivos: responde do cache e atualiza em segundo plano (a versão nova entra na
 // próxima abertura). /api nunca passa pelo cache. Mude VERSAO ao trocar a lista.
-const VERSAO = 'natal-2';
+const VERSAO = 'natal-3';
 const ARQUIVOS = [
   '/', '/index.html', '/manifest.webmanifest',
-  '/assets/css/jogo.css', '/assets/js/jogo.js', '/assets/js/cena.js', '/assets/js/regras.js', '/assets/js/audio.js',
+  '/assets/css/jogo.css', '/assets/js/jogo.js', '/assets/js/cena.js', '/assets/js/regras.js', '/assets/js/audio.js', '/assets/js/anuncios.js',
   '/assets/vendor/three/three.module.min.js',
   '/assets/vendor/three/addons/controls/OrbitControls.js',
   '/assets/vendor/three/addons/geometries/RoundedBoxGeometry.js',

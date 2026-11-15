@@ -32,6 +32,13 @@ export const MAX_CONSTRUTORES = 3;
 export const CUSTO_CONSTRUTOR = [0, 150, 300];   // estrelas pro construtor nº 2 e nº 3 (índice = quantos já tem)
 export const custoAcelerar = (segundos) => Math.max(1, Math.ceil(segundos / 60));
 
+// Anúncio recompensado (o jogador escolhe assistir): +estrelas ou adianta uma obra.
+// Limite por dia (horário de Brasília) pra não virar fazenda de anúncio.
+export const ANUNCIO_ESTRELAS = 3;
+export const ANUNCIO_ADIANTA = 5 * 60;        // segundos que um vídeo tira de uma obra
+export const ANUNCIOS_POR_DIA = 10;
+export function anunciosHoje(v, agora) { const a = v.anuncios || {}; return a.dia === diaDe(agora) ? a.n : 0; }
+
 // Presente diário: um por dia (horário de Brasília). Voltar dias seguidos aumenta o
 // prêmio (ciclo de 7). De 1 a 25 de dezembro vira o Calendário do Advento.
 export const PRESENTE_DIARIO = [
@@ -472,6 +479,21 @@ export function aplicar(v, a, agora) {
       v.missoes = [...(v.missoes || []), m.id];
       receber(v, m.premio);
       return { ok: true, ganho: m.premio };
+    }
+
+    case 'anuncio': {
+      if (anunciosHoje(v, agora) >= ANUNCIOS_POR_DIA) return erro('Chega de vídeos por hoje. Volte amanhã!');
+      let ganho = null;
+      if (a.premio === 'estrelas') { v.estrelas = (v.estrelas || 0) + ANUNCIO_ESTRELAS; ganho = { estrelas: ANUNCIO_ESTRELAS }; }
+      else if (a.premio === 'obra') {
+        const p = predio(v, a.id);
+        if (!p || !p.obra) return erro('Nada em obra aqui');
+        p.obra = { ...p.obra, fim: p.obra.fim - ANUNCIO_ADIANTA * 1000 };
+        if (agora >= p.obra.fim) concluirObra(v, p);
+        ganho = {};
+      } else return erro('Prêmio desconhecido');
+      v.anuncios = { dia: diaDe(agora), n: anunciosHoje(v, agora) + 1 };
+      return { ok: true, ganho };
     }
 
     case 'acelerar': {

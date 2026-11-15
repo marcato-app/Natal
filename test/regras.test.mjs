@@ -3,7 +3,7 @@
 //   node test/regras.test.mjs
 
 import {
-  presenteDeHoje, missoesAtivas, MISSOES, ADVENTO, ganharAlegria, ITENS, bloqueioItem, aluguelDe, TEMPO_ENFEITE, ALUGUEL_CICLO, novaVila, aplicar, avancar, cabe, moradia, prontos, nivelDe, TIPOS, ESTOQUE_MAX, CUSTO_DUENDE,
+  ANUNCIOS_POR_DIA, ANUNCIO_ADIANTA, anunciosHoje, presenteDeHoje, missoesAtivas, MISSOES, ADVENTO, ganharAlegria, ITENS, bloqueioItem, aluguelDe, TEMPO_ENFEITE, ALUGUEL_CICLO, novaVila, aplicar, avancar, cabe, moradia, prontos, nivelDe, TIPOS, ESTOQUE_MAX, CUSTO_DUENDE,
 } from '../assets/js/regras.js';
 
 let pass = 0, fail = 0;
@@ -149,7 +149,7 @@ const fab = (v) => v.predios.find(p => p.tipo === 'fabrica');
   check('casa começa no nível 1', casa.nv === 1 && moradia(v) === 4);
   check('cama precisa da casa nível 2', bloqueioItem(v, casa, 'cama').includes('nível 2'));
   check('melhorar precisa da vila no nível 2', aplicar(v, { tipo: 'melhorar', id: casa.id }, t).erro.includes('nível 2'));
-  v.alegria = 30;
+  v.alegria = 80; v.doces = 500;
   const r = aplicar(v, { tipo: 'melhorar', id: casa.id }, t);
   check('melhorar abre obra e a casa segue nível 1 até acabar', r.ok && casa.obra.tipo === 'melhorar' && casa.nv === 1 && moradia(v) === 4);
   check('durante a obra não decora', aplicar(v, { tipo: 'item', id: casa.id, item: 'guirlanda' }, t).erro.includes('obra'));
@@ -242,6 +242,26 @@ const fab = (v) => v.predios.find(p => p.tipo === 'fabrica');
   check('não resgata duas vezes', !aplicar(v, { tipo: 'missao', id: 'coletar1' }, seg(60)).ok);
   check('a próxima missão entra na lista', missoesAtivas(v).some(m => m.id === 'fachada1'));
   check('todas as missões têm id único', new Set(MISSOES.map(m => m.id)).size === MISSOES.length);
+}
+
+// anúncio recompensado
+{
+  const v = novaVila(T0); v.moedas = 5000;
+  const e0 = v.estrelas;
+  check('vídeo dá estrelas', aplicar(v, { tipo: 'anuncio', premio: 'estrelas' }, T0).ok && v.estrelas - e0 === 3);
+  v.alegria = 80; v.doces = 500;
+  const r = aplicar(v, { tipo: 'construir', predio: 'rinque', x: 2, z: 12 }, T0);
+  const f = v.predios.find(p => p.id === r.id);
+  if (r.ok) {
+    const fim0 = f.obra.fim;
+    aplicar(v, { tipo: 'anuncio', premio: 'obra', id: f.id }, T0);
+    check('vídeo adianta a obra em 5 min', f.obra && fim0 - f.obra.fim === ANUNCIO_ADIANTA * 1000);
+    aplicar(v, { tipo: 'anuncio', premio: 'obra', id: f.id }, T0 + 1000);
+    check('obra que passou do fim fica pronta', !f.obra);
+  } else check('fábrica precisa nível 2 (pula)', true);
+  while (anunciosHoje(v, T0) < ANUNCIOS_POR_DIA) aplicar(v, { tipo: 'anuncio', premio: 'estrelas' }, T0);
+  check('limite de vídeos por dia', aplicar(v, { tipo: 'anuncio', premio: 'estrelas' }, T0).erro.includes('amanhã'));
+  check('no dia seguinte libera de novo', aplicar(v, { tipo: 'anuncio', premio: 'estrelas' }, T0 + 86400000).ok);
 }
 
 check('ação desconhecida falha', !aplicar(novaVila(T0), { tipo: 'hackear' }, T0).ok);

@@ -118,6 +118,17 @@ anúncios precisam de internet.
 - Regras das lojas: compras de itens digitais têm de ser pela Apple/Google (Pix só na
   web); interface sem cara de site; política de privacidade.
 
+## Dinheiro
+
+- **Anúncio recompensado** (`assets/js/anuncios.js`, ação `anuncio`): o jogador escolhe
+  ver um vídeo pra ganhar `ANUNCIO_ESTRELAS` estrelas (loja, no botão de estrelas do
+  topo) ou adiantar uma obra em `ANUNCIO_ADIANTA` s. Máx. `ANUNCIOS_POR_DIA`. No app usa
+  AdMob (`@capacitor-community/admob`); no localhost simula um vídeo de 3 s; na web
+  publicada não aparece. **Os IDs do AdMob são os de TESTE do Google**: trocar em
+  `anuncios.js`, `AndroidManifest.xml` e `Info.plist` antes de publicar (e `EM_TESTE`).
+- **Pacotes de estrelas** aparecem na loja como "em breve": falta criar os produtos na
+  App Store Connect / Google Play e validar o recibo no servidor antes de creditar.
+
 ## Rodar local
 
 ```bash
