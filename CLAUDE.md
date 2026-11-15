@@ -46,6 +46,27 @@ então nada vem de CDN; `sw.js` guarda tudo no aparelho pra abrir offline.
   floresta; trem a vapor com vagões de presentes no trilho atrás da vila; moradores
   passeando.
 
+### Mapa, cidade e visual
+
+- **Expansão**: a vila começa num quadrado 18×18; em volta há 16 terrenos 6×6
+  (`TERRENOS`, de -6 a 24) que se compram com moedas (os dos cantos também com estrelas)
+  a partir dos níveis 2, 3 e 5 (ação `terreno`). `cabe()` só aceita lote dentro da área
+  comprada (`naVila`) e fora das ruas (`RUAS`: rua principal, travessas e avenida em volta).
+- **Casas realistas** (`makeHouse` em `cena.js`): brancas, telhado escuro com
+  acabamento preto, janelas pretas, garagem e varanda; 3 níveis e variantes escolhidas
+  pelo id do prédio (`VARIANTES`). Peças iguais são fundidas por material (`fundir`) pra
+  aguentar celular.
+- **Pinheiros** (`pinheiro`, `abeto`, `espruce`): cones de galhos, sem copa redonda;
+  aceitam pisca-pisca (`ITENS[tipo].luzes`, grupo `pisca`).
+- **Clima**: a neve começa e para num ciclo de 10 min (`CLIMA` em `cena.js`), com
+  céu e neblina acompanhando. Só visual.
+- **Cidade**: calçadas e postes nas ruas, bairro vizinho com casas e igreja fora do mapa,
+  floresta em volta, trilho do trem atrás.
+- **Em pé e deitado**: `jogo.css` tem um layout de paisagem
+  (`(orientation: landscape) and (max-height: 520px)`): botões numa coluna à direita,
+  painéis do lado, e a cena desloca pro lado livre (`setDeslocamento`).
+- **20 níveis** (`NIVEIS`) com prédios novos até o castelo; a oficina produz estrelas.
+
 ### Obras, construtores e estrelas (estilo jogo de construir)
 
 - Construir (`TIPOS[x].tempo`) e aumentar a casa (`melhorias[n].tempo`) abrem uma obra
@@ -182,7 +203,11 @@ Rodam contra SQLite real (`node:sqlite`), não mock:
 ```bash
 node test/regras.test.mjs   # regras do jogo
 node test/api.test.mjs      # API + roteamento
+node test/e2e.mjs           # navegador de verdade (Playwright), celular em pé e deitado; telas em .e2e/
 ```
+
+O `e2e.mjs` sobe o servidor local na porta 8799 e usa o gancho `window.__teste`
+(só existe em localhost).
 
 ## Próximas etapas
 

@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "test": "node test/regras.test.mjs && node test/api.test.mjs",
+    "test:e2e": "node test/e2e.mjs",
     "app:web": "node scripts/app-web.mjs",
     "app:sync": "node scripts/app-web.mjs && cap sync",
     "app:android": "node scripts/app-web.mjs && cap sync android && cap open android",
