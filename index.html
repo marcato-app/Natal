@@ -20,6 +20,9 @@
   <symbol id="i-alegria" viewBox="0 0 24 24"><path d="M12 20.5s-8-4.8-8-10.5a4.5 4.5 0 0 1 8-2.8 4.5 4.5 0 0 1 8 2.8c0 5.7-8 10.5-8 10.5z" fill="#ff8fb1" stroke="#e0567f" stroke-width="1.6"/></symbol>
   <symbol id="i-estrela" viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17l-5.9 3.3 1.3-6.5L2.5 9.3l6.6-.8z" fill="#ffd76a" stroke="#d99a12" stroke-width="1.5" stroke-linejoin="round"/></symbol>
   <symbol id="i-relogio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></symbol>
+  <symbol id="i-presente" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="9" width="18" height="12" rx="2"/><path d="M12 9v12M3 13h18M12 9c-2-4-6-4-6-1.5S10 9 12 9zm0 0c2-4 6-4 6-1.5S14 9 12 9z"/></symbol>
+  <symbol id="i-alvo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></symbol>
+  <symbol id="i-ajustes" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></symbol>
   <symbol id="i-elfo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><path d="M6 19C8 13 10 8 13 4c2 3 4 5 6 6"/><circle cx="19.5" cy="10.5" r="1.6"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
   <symbol id="i-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></symbol>
@@ -52,12 +55,18 @@
     </div>
   </header>
 
+  <div class="linha-topo">
+    <button type="button" class="missao-chip glass" id="missao-chip" data-abrir="missoes"><svg aria-hidden="true"><use href="#i-alvo"/></svg><span id="missao-texto">Missões</span><i class="ponto" id="missao-ponto" hidden></i></button>
+    <button type="button" class="round glass" data-abrir="ajustes" aria-label="Ajustes"><svg aria-hidden="true"><use href="#i-ajustes"/></svg></button>
+  </div>
+
   <div class="spacer"></div>
 
   <!-- barra principal -->
   <nav class="nav" id="nav" aria-label="Ações">
     <button type="button" class="primary" data-abrir="construir"><span class="ic"><svg aria-hidden="true"><use href="#i-martelo"/></svg></span>Construir</button>
     <button type="button" data-abrir="duendes"><span class="ic glass"><svg aria-hidden="true"><use href="#i-elfo"/></svg></span><span id="nav-duendes">Duendes</span></button>
+    <button type="button" data-abrir="presente"><span class="ic glass"><svg aria-hidden="true"><use href="#i-presente"/></svg><i class="ponto" id="presente-ponto" hidden></i></span>Presente</button>
     <button type="button" data-abrir="amigos"><span class="ic glass"><svg aria-hidden="true"><use href="#i-amigos"/></svg></span>Amigos</button>
   </nav>
 
@@ -104,6 +113,39 @@
     <p class="info" id="dd-info"></p>
     <ul class="elf-list" id="dd-lista"></ul>
     <button type="button" class="cta" id="dd-contratar">Contratar duende</button>
+  </section>
+
+  <!-- missões -->
+  <section class="sheet glass" id="sheet-missoes" hidden aria-label="Missões">
+    <div class="sheet-head"><h2>Missões</h2><button type="button" class="round" data-fechar aria-label="Fechar"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
+    <div class="itens" id="ms-lista"></div>
+  </section>
+
+  <!-- presente diário / calendário do Advento -->
+  <section class="sheet glass" id="sheet-presente" hidden aria-label="Presente do dia">
+    <div class="sheet-head"><div><h2 id="pr-titulo">Presente do dia</h2><div class="sub" id="pr-sub"></div></div><button type="button" class="round" data-fechar aria-label="Fechar"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
+    <div class="calendario" id="pr-grade"></div>
+    <button type="button" class="cta gold" id="pr-abrir">Abrir presente</button>
+  </section>
+
+  <!-- ajustes -->
+  <section class="sheet glass" id="sheet-ajustes" hidden aria-label="Ajustes">
+    <div class="sheet-head"><h2>Ajustes</h2><button type="button" class="round" data-fechar aria-label="Fechar"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
+    <label class="ajuste"><span>Música</span><input type="checkbox" id="aj-musica"></label>
+    <label class="ajuste"><span>Sons</span><input type="checkbox" id="aj-sons"></label>
+    <div class="ajuste"><span>Qualidade dos gráficos</span><select id="aj-qualidade"><option value="2">Alta</option><option value="1">Média</option><option value="0">Leve</option></select></div>
+  </section>
+
+  <!-- boas-vindas -->
+  <section class="sheet glass" id="sheet-boasvindas" hidden aria-label="Boas-vindas">
+    <div class="sheet-head"><h2>Bem-vindo à sua Vila de Natal!</h2></div>
+    <ol class="passos">
+      <li><b>Colete</b> o que os duendes produzem tocando nos balões.</li>
+      <li><b>Construa</b> casas, padaria, fábrica e decorações.</li>
+      <li><b>Enfeite</b> a árvore e as casas: casa enfeitada recebe o Papai Noel, que traz o aluguel.</li>
+      <li>Siga as <b>missões</b> lá em cima pra ganhar prêmios.</li>
+    </ol>
+    <button type="button" class="cta gold" id="bv-ok">Vamos lá!</button>
   </section>
 
   <!-- amigos (próxima etapa) -->

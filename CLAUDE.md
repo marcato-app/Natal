@@ -55,6 +55,19 @@ Three.js (0.160.0) vem do jsDelivr pelo importmap do `index.html`.
   (`CUSTO_CONSTRUTOR`). Ganha `ESTRELAS_POR_NIVEL` a cada nível (`ganharAlegria`). É a
   moeda que anúncio recompensado e compras vão dar.
 
+### Retenção
+
+- **Presente diário** (`presente`): um por dia no horário de Brasília (`diaDe`); dias
+  seguidos sobem a sequência de 7 (`PRESENTE_DIARIO`). De 1 a 25/12 vira o Calendário
+  do Advento (`ADVENTO`). Estado em `v.diario`.
+- **Missões** (`MISSOES`, ação `missao`): 3 ativas por vez, progresso lido do estado e
+  dos contadores `v.stats` (coletas, aluguéis). Servem de tutorial; `foco` diz pra onde
+  o botão "Ir" leva.
+- **Som** (`assets/js/audio.js`): tudo sintetizado com Web Audio (nada pra baixar).
+  Música "Jingle Bells" (domínio público) em timbre de sino + efeitos. Liga no primeiro
+  toque; preferências em `localStorage['natal.som']`.
+- Boas-vindas no primeiro acesso (`localStorage['natal.boasvindas']`).
+
 ### Como o salvamento funciona
 
 A vila inteira é um JSON (formato em `regras.js`, gravado em `vilas.estado`). O

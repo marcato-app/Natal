@@ -55,7 +55,7 @@ svg { flex-shrink: 0; }
 @keyframes pulse { 50% { transform: scale(1.12); } }
 
 /* barra principal */
-.nav { align-self: center; display: flex; gap: 14px; }
+.nav { align-self: center; display: flex; gap: 10px; }
 .nav button { background: none; border: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 13px; font-weight: 800; cursor: pointer; padding: 0; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
 .nav .ic { width: 62px; height: 62px; border-radius: 22px; display: grid; place-items: center; }
 .nav .ic svg { width: 28px; height: 28px; }
@@ -124,6 +124,26 @@ button.pill { border: 1px solid var(--line); color: var(--snow); cursor: pointer
 .balao.obra { background: #2a3358; color: var(--snow); padding: 6px 10px; font-size: 13px; }
 .balao.obra::after { border-top-color: #2a3358; }
 .balao.obra svg { width: 16px; height: 16px; color: var(--gold); }
+
+/* missões, presente, ajustes */
+.linha-topo { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.missao-chip { position: relative; display: flex; align-items: center; gap: 8px; min-height: 40px; max-width: min(78vw, 360px); padding: 6px 14px 6px 10px; border-radius: 20px; font-weight: 800; font-size: 13px; text-align: left; cursor: pointer; }
+.missao-chip svg { width: 20px; height: 20px; color: var(--gold); }
+.missao-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ponto { position: absolute; top: -3px; right: -3px; width: 14px; height: 14px; border-radius: 50%; background: var(--berry); border: 2px solid var(--night); }
+.nav .ic { position: relative; }
+.calendario { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+.calendario.advento { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.dia { aspect-ratio: 1; border-radius: 12px; border: 1px solid var(--line); background: rgba(255,255,255,.06); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; font-weight: 900; color: var(--muted); }
+.dia b { font: 700 15px/1 var(--display); color: var(--snow); }
+.dia.aberto { background: rgba(92,214,166,.16); border-color: rgba(92,214,166,.5); }
+.dia.hoje { border: 2px solid var(--gold); background: rgba(255,201,77,.16); }
+.dia svg { width: 14px; height: 14px; }
+.ajuste { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 4px 14px; border-radius: 14px; background: rgba(255,255,255,.06); font-weight: 800; }
+.ajuste input { width: 22px; height: 22px; accent-color: var(--mint); }
+.ajuste select { min-height: 36px; border-radius: 10px; background: var(--night); color: var(--snow); border: 1px solid var(--line); padding: 0 8px; font: inherit; }
+.passos { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 1.4; color: var(--muted); }
+.passos b { color: var(--snow); }
 
 /* itens (enfeites, fachada, móveis) */
 .secao { margin: 4px 0 -4px; font: 600 15px/1.2 var(--display); color: var(--muted); }

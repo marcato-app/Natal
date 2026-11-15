@@ -6,10 +6,12 @@ import {
   TIPOS, CATEGORIAS, CUSTO_DUENDE, ESTOQUE_MAX, ITENS,
   novaVila, aplicar, avancar, cabe, predio, duendesEm, moradia, moradiaDe, prontos, podePagar,
   nivelItem, bloqueioItem, aluguelDe, ALUGUEL_CICLO, PRESENTE_DOCES,
+  presenteDeHoje, missoesAtivas, PRESENTE_DIARIO, ADVENTO, diaDe,
   emConstrucao, obrasDeConstrutor, construtores, custoAcelerar, TEMPO_ENFEITE, CUSTO_CONSTRUTOR, MAX_CONSTRUTORES, ESTRELAS_POR_NIVEL,
   nivelDe, progressoNivel, alegriaAoConstruir,
 } from './regras.js';
 import { criarCena } from './cena.js';
+import * as som from './audio.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.floor(n).toLocaleString('pt-BR');
@@ -101,12 +103,14 @@ async function enviar() {
 function agir(acao) {
   const nivelAntes = nivelDe(estado.alegria);
   const r = aplicar(estado, acao, agora());
-  if (!r.ok) { toast(r.erro); return r; }
+  if (!r.ok) { toast(r.erro); som.tocar('erro'); return r; }
   fila.push(acao);
   guardar();
   agendarEnvio();
   const nivelDepois = nivelDe(estado.alegria);
   if (nivelDepois > nivelAntes) subiuNivel(nivelDepois);
+  if (acao.tipo === 'construir' && r.obra || acao.tipo === 'melhorar') som.tocar('martelo');
+  if (acao.tipo === 'acelerar') som.tocar('pronto');
   desenhar();
   return r;
 }
@@ -126,6 +130,7 @@ function toast(msg) {
 }
 
 function subiuNivel(n) {
+  som.tocar('nivel');
   const novos = Object.values(TIPOS).filter(t => t.cat && t.nivel === n).map(t => t.nome);
   toast(`Nível ${n}! +${ESTRELAS_POR_NIVEL} estrelas` + (novos.length ? ` · Liberou: ${novos.join(', ')}` : ''));
 }
@@ -149,6 +154,11 @@ function desenharHud() {
     ultimos[r] = v; el.textContent = fmt(v);
   }
   $('nav-duendes').textContent = `Duendes ${estado.duendes.length}/${moradia(estado)}`;
+  const ativas = missoesAtivas(estado), prontaM = ativas.find(m => m.progresso(estado) >= m.meta);
+  const m1 = prontaM || ativas[0];
+  $('missao-texto').textContent = m1 ? (prontaM ? `Prêmio pronto: ${m1.texto}` : `${m1.texto} · ${Math.min(m1.progresso(estado), m1.meta)}/${m1.meta}`) : 'Todas as missões feitas!';
+  $('missao-ponto').hidden = !prontaM;
+  $('presente-ponto').hidden = !presenteDeHoje(estado, agora());
 }
 
 function desenhar() {
@@ -166,11 +176,14 @@ function desenhar() {
 function abrir(qual) {
   if (colocando || dentro) return;
   painel = qual;
-  for (const p of ['construir', 'predio', 'duendes', 'amigos']) $('sheet-' + p).hidden = p !== qual;
+  for (const p of ['construir', 'predio', 'duendes', 'amigos', 'missoes', 'presente', 'ajustes', 'boasvindas']) $('sheet-' + p).hidden = p !== qual;
   $('nav').hidden = !!qual;
   if (qual !== 'predio') { selecionado = null; cena.setSelecionado(null); }
   if (qual === 'construir') { desenharAbas(); desenharCards(); }
   if (qual === 'duendes') desenharDuendes();
+  if (qual === 'missoes') desenharMissoes();
+  if (qual === 'presente') desenharPresente();
+  if (qual === 'ajustes') { const pf = som.preferencias(); $('aj-musica').checked = pf.musica; $('aj-sons').checked = pf.sons; $('aj-qualidade').value = String(cena.qualidade()); }
   if (qual === 'predio') { vendaPendente = false; desenharPredio.chave = null; desenharPredio(); }
   deslocarCena();
 }
@@ -354,6 +367,61 @@ function blocoObra(p) {
     <button type="button" class="cta gold largo" data-acao="acelerar" ${(estado.estrelas || 0) >= custo ? '' : 'disabled'}>Terminar agora · ${svg('i-estrela')} ${custo}</button>`;
 }
 
+// Missões
+const premioHtml = (premio) => Object.entries(premio).map(([r, q]) => `<span>${svg(ICONE[r])}${fmt(q)}</span>`).join('');
+function desenharMissoes() {
+  const ativas = missoesAtivas(estado);
+  $('ms-lista').innerHTML = ativas.length ? ativas.map(m => {
+    const pr = Math.min(m.progresso(estado), m.meta), feita = pr >= m.meta;
+    const botao = feita ? `<button type="button" class="buy" data-missao="${m.id}">Pegar<span class="cost">${premioHtml(m.premio)}</span></button>`
+      : m.foco ? `<button type="button" class="buy caro" data-ir="${m.foco}">Ir<span class="cost">${premioHtml(m.premio)}</span></button>` : `<span class="bloq">${premioHtml(m.premio)}</span>`;
+    return `<div class="item-row"><div class="item-info"><b>${m.texto}</b><div class="bar"><i style="width:${pr / m.meta * 100}%"></i></div><small>${pr} de ${m.meta}</small></div>${botao}</div>`;
+  }).join('') : '<p class="info">Você completou todas as missões. Mais chegam em breve!</p>';
+}
+$('ms-lista').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-missao]');
+  if (b) { const r = agir({ tipo: 'missao', id: b.dataset.missao }); if (r.ok) { som.tocar('presente'); toast(`Missão cumprida! ${Object.entries(r.ganho).map(([k, q]) => `+${fmt(q)} ${k}`).join(' ')}`); desenharMissoes(); } return; }
+  const ir = e.target.closest('[data-ir]'); if (!ir) return;
+  const f = ir.dataset.ir;
+  if (f === 'construir' || f === 'duendes') abrir(f);
+  else if (estado.predios.some(p => p.tipo === f)) selecionar(estado.predios.find(p => p.tipo === f).id);
+  else { abrir('construir'); toast(`Construa: ${TIPOS[f]?.nome || f}`); }
+});
+
+// Presente do dia / Calendário do Advento
+function desenharPresente() {
+  const h = presenteDeHoje(estado, agora()), d = estado.diario || {};
+  const hoje = new Date(agora() - 3 * 3600000), diaMes = hoje.getUTCDate(), dezembro = hoje.getUTCMonth() === 11 && diaMes <= 25;
+  if (dezembro) {
+    $('pr-titulo').textContent = 'Calendário do Advento';
+    $('pr-sub').textContent = h ? `Dia ${diaMes}: abra a janelinha de hoje!` : `Volte amanhã pra abrir o dia ${diaMes + 1}`;
+    $('pr-grade').className = 'calendario advento';
+    $('pr-grade').innerHTML = ADVENTO.map((p, i) => { const n = i + 1, aberto = n < diaMes || (n === diaMes && !h); return `<div class="dia ${aberto ? 'aberto' : ''} ${n === diaMes ? 'hoje' : ''}"><b>${n}</b>${aberto ? svg('i-ok') : svg(ICONE[Object.keys(p)[Object.keys(p).length - 1]])}</div>`; }).join('');
+  } else {
+    const seq = h ? h.sequencia : (d.sequencia || 1), pos = (seq - 1) % 7;
+    $('pr-titulo').textContent = 'Presente do dia';
+    $('pr-sub').textContent = h ? `Dia ${seq} seguido: volte todo dia pra presentes maiores` : 'Você já abriu o de hoje. Volte amanhã!';
+    $('pr-grade').className = 'calendario';
+    $('pr-grade').innerHTML = PRESENTE_DIARIO.map((p, i) => { const aberto = i < pos || (i === pos && !h); return `<div class="dia ${aberto ? 'aberto' : ''} ${i === pos ? 'hoje' : ''}"><b>${i + 1}</b>${svg(ICONE[Object.keys(p)[0]])}<span>${fmt(Object.values(p)[0])}</span></div>`; }).join('');
+  }
+  const btn = $('pr-abrir');
+  btn.disabled = !h;
+  btn.innerHTML = h ? `Abrir presente <span class="cost">${premioHtml(h.premio)}</span>` : 'Volte amanhã';
+}
+$('pr-abrir').addEventListener('click', () => {
+  const r = agir({ tipo: 'presente' });
+  if (!r.ok) return;
+  som.tocar('presente');
+  toast(`${r.advento ? `Advento, dia ${r.advento}` : 'Presente do dia'}: ${Object.entries(r.ganho).map(([k, q]) => `+${fmt(q)} ${k}`).join(' ')}`);
+  desenharPresente();
+});
+
+// Ajustes
+$('aj-musica').addEventListener('change', (e) => { som.iniciar(); som.setMusica(e.target.checked); });
+$('aj-sons').addEventListener('change', (e) => som.setSons(e.target.checked));
+$('aj-qualidade').addEventListener('change', (e) => cena.setQualidade(Number(e.target.value)));
+$('bv-ok').addEventListener('click', () => { try { localStorage.setItem('natal.boasvindas', '1'); } catch { /* ok */ } som.iniciar(); fechar(); });
+
 // Itens (enfeites da árvore, fachada, móveis)
 function linhasItens(p, grupo) {
   return Object.entries(ITENS[p.tipo]).filter(([, d]) => d.grupo === grupo).map(([k, d]) => {
@@ -466,6 +534,7 @@ function coletar(id, ponto = null) {
   if (ponto) pos = { left: ponto.x, top: ponto.y, width: 0 };
   const r = agir({ tipo: 'coletar', id });
   if (!r.ok) return;
+  som.tocar('moeda');
   if (pos) {
     Object.entries(r.ganho).forEach(([rec, q], i) => {
       const el = document.createElement('div'); el.className = 'voa';
@@ -640,6 +709,10 @@ async function iniciar() {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
     navigator.storage?.persist?.().catch(() => {});
   }
+  document.addEventListener('pointerdown', () => som.iniciar(), { once: true });
+  document.addEventListener('click', (e) => { if (e.target.closest('button')) som.tocar('clique'); });
+  let viu = null; try { viu = localStorage.getItem('natal.boasvindas'); } catch { /* ok */ }
+  if (!viu) abrir('boasvindas');
   if (!online) toast('Jogando sem conexão: o progresso fica salvo neste aparelho.');
   if (fila.length) agendarEnvio(500);
 
@@ -649,7 +722,7 @@ async function iniciar() {
     avancar(estado, agora());
     const prontas = obras.filter(([p]) => !p.obra);
     for (const [p, tipo] of prontas) toast(tipo === 'construir' ? `${TIPOS[p.tipo].nome} pronta!${TIPOS[p.tipo].prod ? ' Coloque duendes nela.' : ''}` : tipo === 'melhorar' ? `Casa aumentada pro nível ${p.nv}!` : 'Os moradores terminaram de enfeitar a árvore!');
-    if (prontas.length) cena.sincronizar(estado);
+    if (prontas.length) { cena.sincronizar(estado); som.tocar('pronto'); }
     if (nivelDe(estado.alegria) > nivelAntes) subiuNivel(nivelDe(estado.alegria));
     desenharHud();
     sincBaloes();
@@ -667,6 +740,7 @@ async function iniciar() {
     const alvos = estado.predios.filter(p => aluguelDe(p) && prontos(p) >= 1).map(p => ({ id: p.id, pos: cena.chamineDe(p.id) })).filter(a => a.pos);
     if (!alvos.length && ++semVisita % 5) return;
     semVisita = 0;
+    som.tocar('guizos');
     cena.papaiNoel(alvos, (id) => { const ch = cena.chamineDe(id), sc = ch && cena.projetar(ch); coletar(id, sc && sc.visivel && !dentro ? sc : null); });
   };
   setTimeout(chamarNoel, 6000);

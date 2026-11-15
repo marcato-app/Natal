@@ -3,7 +3,7 @@
 //   node test/regras.test.mjs
 
 import {
-  ganharAlegria, ITENS, bloqueioItem, aluguelDe, TEMPO_ENFEITE, ALUGUEL_CICLO, novaVila, aplicar, avancar, cabe, moradia, prontos, nivelDe, TIPOS, ESTOQUE_MAX, CUSTO_DUENDE,
+  presenteDeHoje, missoesAtivas, MISSOES, ADVENTO, ganharAlegria, ITENS, bloqueioItem, aluguelDe, TEMPO_ENFEITE, ALUGUEL_CICLO, novaVila, aplicar, avancar, cabe, moradia, prontos, nivelDe, TIPOS, ESTOQUE_MAX, CUSTO_DUENDE,
 } from '../assets/js/regras.js';
 
 let pass = 0, fail = 0;
@@ -210,6 +210,38 @@ const fab = (v) => v.predios.find(p => p.tipo === 'fabrica');
   const r = aplicar(v, { tipo: 'coletar', id: casa.id }, seg(ALUGUEL_CICLO * 5));
   check('coleta o aluguel de 2 ciclos com presente', r.ok && v.moedas - m0 === 22 && v.doces - d0 === 4, r);
   check('aluguel fica no máximo do estoque', (avancar(v, seg(ALUGUEL_CICLO * 999)), prontos(casa) === ESTOQUE_MAX));
+}
+
+// presente diário e calendário do Advento
+{
+  const dia = (iso) => Date.parse(iso + 'T15:00:00Z'); // meio-dia em Brasília
+  const v = novaVila(dia('2026-11-20'));
+  const m0 = v.moedas;
+  const r1 = aplicar(v, { tipo: 'presente' }, dia('2026-11-20'));
+  check('abre o presente do dia 1 da sequência', r1.ok && r1.sequencia === 1 && v.moedas - m0 === 50);
+  check('só um por dia', aplicar(v, { tipo: 'presente' }, dia('2026-11-20') + 3600_000).erro.includes('hoje'));
+  check('dia seguinte continua a sequência', aplicar(v, { tipo: 'presente' }, dia('2026-11-21')).sequencia === 2);
+  check('pulou um dia: sequência volta pra 1', aplicar(v, { tipo: 'presente' }, dia('2026-11-23')).sequencia === 1);
+  check('virada do dia é no horário de Brasília', presenteDeHoje(v, Date.parse('2026-11-24T02:30:00Z')) === null);
+  const w = novaVila(dia('2026-12-25'));
+  const e0 = w.estrelas, r2 = aplicar(w, { tipo: 'presente' }, dia('2026-12-25'));
+  check('25 de dezembro: presentão do Advento', r2.advento === 25 && w.estrelas - e0 === ADVENTO[24].estrelas);
+  check('26 de dezembro volta ao presente comum', presenteDeHoje(novaVila(0), dia('2026-12-26')).advento === null);
+}
+
+// missões
+{
+  const v = novaVila(T0);
+  check('3 missões ativas no começo', missoesAtivas(v).length === 3 && missoesAtivas(v)[0].id === 'coletar1');
+  check('não resgata missão não cumprida', aplicar(v, { tipo: 'missao', id: 'coletar1' }, T0).erro.includes('cumprida'));
+  check('não resgata missão ainda não liberada', aplicar(v, { tipo: 'missao', id: 'arvore' }, T0).erro.includes('liberada'));
+  avancar(v, seg(60));
+  aplicar(v, { tipo: 'coletar', id: fab(v).id }, seg(60));
+  const m0 = v.moedas;
+  check('cumpriu e resgata o prêmio', aplicar(v, { tipo: 'missao', id: 'coletar1' }, seg(60)).ok && v.moedas - m0 === 30);
+  check('não resgata duas vezes', !aplicar(v, { tipo: 'missao', id: 'coletar1' }, seg(60)).ok);
+  check('a próxima missão entra na lista', missoesAtivas(v).some(m => m.id === 'fachada1'));
+  check('todas as missões têm id único', new Set(MISSOES.map(m => m.id)).size === MISSOES.length);
 }
 
 check('ação desconhecida falha', !aplicar(novaVila(T0), { tipo: 'hackear' }, T0).ok);

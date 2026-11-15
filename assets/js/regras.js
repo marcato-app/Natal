@@ -32,6 +32,54 @@ export const MAX_CONSTRUTORES = 3;
 export const CUSTO_CONSTRUTOR = [0, 150, 300];   // estrelas pro construtor nº 2 e nº 3 (índice = quantos já tem)
 export const custoAcelerar = (segundos) => Math.max(1, Math.ceil(segundos / 60));
 
+// Presente diário: um por dia (horário de Brasília). Voltar dias seguidos aumenta o
+// prêmio (ciclo de 7). De 1 a 25 de dezembro vira o Calendário do Advento.
+export const PRESENTE_DIARIO = [
+  { moedas: 50 }, { doces: 20 }, { moedas: 120 }, { estrelas: 2 }, { moedas: 200, doces: 20 }, { doces: 50 }, { estrelas: 6, moedas: 300 },
+];
+export const ADVENTO = [
+  { moedas: 100 }, { doces: 30 }, { estrelas: 3 }, { moedas: 150 }, { doces: 40 }, { moedas: 200 }, { estrelas: 5 },
+  { moedas: 250 }, { doces: 50 }, { moedas: 300, doces: 20 }, { estrelas: 5 }, { moedas: 350 }, { doces: 60 }, { estrelas: 8 },
+  { moedas: 400 }, { doces: 70 }, { moedas: 450, estrelas: 3 }, { doces: 80 }, { estrelas: 10 }, { moedas: 500 },
+  { doces: 100 }, { moedas: 600, estrelas: 5 }, { doces: 120, estrelas: 5 }, { moedas: 800, doces: 100 }, { moedas: 1500, doces: 200, estrelas: 25 },
+];
+const BRT = 3 * 3600 * 1000;
+export function diaDe(agora) { return new Date(agora - BRT).toISOString().slice(0, 10); }
+// O que o presente de hoje daria (ou null se já pegou). { premio, sequencia, advento: dia|null }
+export function presenteDeHoje(v, agora) {
+  const hoje = diaDe(agora), d = v.diario || {};
+  if (d.ultimo === hoje) return null;
+  const sequencia = d.ultimo === diaDe(agora - 86400000) ? (d.sequencia || 0) + 1 : 1;
+  const data = new Date(agora - BRT), dia = data.getUTCDate();
+  const advento = data.getUTCMonth() === 11 && dia <= 25 ? dia : null;
+  return { premio: advento ? ADVENTO[dia - 1] : PRESENTE_DIARIO[(sequencia - 1) % 7], sequencia, advento };
+}
+
+// Missões: objetivos em sequência que também ensinam o jogo. progresso(v) lê só o
+// estado da vila (e os contadores em v.stats), então cliente e servidor concordam.
+const somaItens = (v, tipo, grupo) => v.predios.filter(p => p.tipo === tipo).reduce((s, p) => s + Object.entries(p.itens || {}).reduce((t, [k, n]) => t + (ITENS[tipo][k].grupo === grupo ? n : 0), 0), 0);
+const stat = (v, k) => (v.stats && v.stats[k]) || 0;
+export const MISSOES = [
+  { id: 'coletar1', texto: 'Colete a produção da fábrica', meta: 1, progresso: v => stat(v, 'coletas'), premio: { moedas: 30 }, foco: 'fabrica' },
+  { id: 'padaria', texto: 'Construa uma Padaria de Biscoitos', meta: 1, progresso: v => v.predios.filter(p => p.tipo === 'padaria' && !p.obra).length, premio: { estrelas: 3 }, foco: 'construir' },
+  { id: 'enfeite1', texto: 'Pendure o primeiro enfeite na árvore', meta: 1, progresso: v => somaItens(v, 'praca', 'arvore'), premio: { moedas: 40 }, foco: 'praca' },
+  { id: 'fachada1', texto: 'Enfeite a fachada da casa', meta: 1, progresso: v => somaItens(v, 'casa', 'fachada'), premio: { doces: 20 }, foco: 'casa' },
+  { id: 'padaria2', texto: 'Coloque 2 duendes na padaria', meta: 2, progresso: v => Math.max(0, ...v.predios.filter(p => p.tipo === 'padaria').map(p => duendesEm(v, p.id))), premio: { moedas: 50 }, foco: 'padaria' },
+  { id: 'noel', texto: 'Receba a visita do Papai Noel', meta: 1, progresso: v => stat(v, 'alugueis'), premio: { estrelas: 3 }, foco: 'casa' },
+  { id: 'duende4', texto: 'Contrate mais um duende', meta: 4, progresso: v => v.duendes.length, premio: { doces: 30 }, foco: 'duendes' },
+  { id: 'moveis3', texto: 'Coloque 3 móveis na casa', meta: 3, progresso: v => somaItens(v, 'casa', 'moveis'), premio: { moedas: 80 }, foco: 'casa' },
+  { id: 'nivel3', texto: 'Chegue ao nível 3 da vila', meta: 3, progresso: v => nivelDe(v.alegria), premio: { estrelas: 5 } },
+  { id: 'estrela', texto: 'Coloque a estrela no topo da árvore', meta: 1, progresso: v => v.predios.some(p => p.tipo === 'praca' && nivelItem(p, 'estrela')) ? 1 : 0, premio: { estrelas: 10 }, foco: 'praca' },
+  { id: 'casa2', texto: 'Aumente uma casa pro nível 2', meta: 2, progresso: v => Math.max(1, ...v.predios.filter(p => p.tipo === 'casa').map(p => p.nv || 1)), premio: { estrelas: 5 }, foco: 'casa' },
+  { id: 'coletar30', texto: 'Faça 30 coletas', meta: 30, progresso: v => stat(v, 'coletas'), premio: { moedas: 150, doces: 30 } },
+  { id: 'arvore', texto: 'Complete todos os enfeites da árvore', meta: 12, progresso: v => somaItens(v, 'praca', 'arvore'), premio: { estrelas: 20 }, foco: 'praca' },
+];
+// As 3 primeiras missões ainda não resgatadas.
+export function missoesAtivas(v) {
+  const feitas = new Set(v.missoes || []);
+  return MISSOES.filter(m => !feitas.has(m.id)).slice(0, 3);
+}
+
 // Aluguel das casas: só casa enfeitada recebe o Papai Noel, que recolhe o aluguel e
 // deixa um presente (doces). Rende a cada ALUGUEL_CICLO segundos, sem precisar de duende.
 export const ALUGUEL_CICLO = 120;
@@ -277,6 +325,8 @@ function concluirObra(v, p) {
 /* ------------------------------ ações ------------------------------ */
 
 function pagar(v, custo) { for (const [r, q] of Object.entries(custo)) v[r] -= q; }
+function receber(v, premio) { for (const [r, q] of Object.entries(premio)) r === 'alegria' ? ganharAlegria(v, q) : (v[r] = (v[r] || 0) + q); }
+function contar(v, k, n = 1) { v.stats = { ...(v.stats || {}), [k]: (v.stats?.[k] || 0) + n }; }
 const erro = (msg) => ({ ok: false, erro: msg });
 
 // Aplica uma ação na vila (muda o objeto). Devolve { ok, erro?, ganho? }.
@@ -331,6 +381,7 @@ export function aplicar(v, a, agora) {
         if (k < 1 || !aluguelDe(p)) return erro('Nada pronto ainda');
         p.prog -= k;
         const ganho = { moedas: k * aluguelDe(p), doces: k * PRESENTE_DOCES, alegria: k };
+        contar(v, 'alugueis');
         for (const [r, q] of Object.entries(ganho)) r === 'alegria' ? ganharAlegria(v, q) : (v[r] += q);
         return { ok: true, ganho };
       }
@@ -340,6 +391,7 @@ export function aplicar(v, a, agora) {
       if (k < 1) return erro('Nada pronto ainda');
       p.prog -= k;
       const ganho = { [pr.recurso]: k * pr.qtd };
+      contar(v, 'coletas');
       if (pr.recurso !== 'alegria') ganho.alegria = k;
       for (const [r, q] of Object.entries(ganho)) r === 'alegria' ? ganharAlegria(v, q) : (v[r] += q);
       return { ok: true, ganho };
@@ -401,6 +453,25 @@ export function aplicar(v, a, agora) {
       p.itens = { ...(p.itens || {}), [a.item]: n + 1 };
       ganharAlegria(v, def.alegria[n]);
       return { ok: true, nivel: n + 1, ganho: { alegria: def.alegria[n] } };
+    }
+
+    case 'presente': {
+      const h = presenteDeHoje(v, agora);
+      if (!h) return erro('Você já abriu o presente de hoje');
+      receber(v, h.premio);
+      v.diario = { ultimo: diaDe(agora), sequencia: h.sequencia };
+      return { ok: true, ganho: h.premio, sequencia: h.sequencia, advento: h.advento };
+    }
+
+    case 'missao': {
+      const m = MISSOES.find(x => x.id === a.id);
+      if (!m) return erro('Missão desconhecida');
+      if ((v.missoes || []).includes(m.id)) return erro('Prêmio já resgatado');
+      if (!missoesAtivas(v).includes(m)) return erro('Missão ainda não liberada');
+      if (m.progresso(v) < m.meta) return erro('Missão ainda não cumprida');
+      v.missoes = [...(v.missoes || []), m.id];
+      receber(v, m.premio);
+      return { ok: true, ganho: m.premio };
     }
 
     case 'acelerar': {
