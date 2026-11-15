@@ -653,6 +653,123 @@ function criarSala() {
   return { scene: s, fogoLuz, marcas, moveis: new Map(), raiz: new THREE.Group() };
 }
 
+// ---------- vida da vila: carros, trem, moradores, Papai Noel ----------
+const vidroMat = mat(0x1d2a4a, { roughness: 0.15, metalness: 0.4 });
+const pneuMat = mat(0x1a1a22, { roughness: 0.9 });
+function farol(g, x, y, z, cor, s = 0.12) { const b = mesh(new THREE.SphereGeometry(s, 8, 6), bulbMat.clone(), x, y, z); b.material.color.setRGB(...cor); b.userData.noShadow = true; g.add(b); return b; }
+
+function makeCar(cor, comArvore) {
+  const g = new THREE.Group(), lata = mat(cor, { roughness: 0.35, metalness: 0.3 });
+  g.add(mesh(rbox(2.6, 0.7, 1.3, 0.25, 3), lata, 0, 0.6, 0));
+  g.add(mesh(rbox(1.5, 0.62, 1.16, 0.22, 3), vidroMat, -0.15, 1.15, 0));
+  g.add(mesh(rbox(1.35, 0.14, 1.05, 0.06), lata, -0.15, 1.5, 0));
+  g.add(mesh(rbox(1.3, 0.16, 1.0, 0.07), snowMat, -0.15, 1.6, 0));
+  for (const x of [-0.85, 0.85]) for (const z of [-0.62, 0.62]) { const w = mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.22, 14), pneuMat, x, 0.3, z); w.rotation.x = Math.PI / 2; g.add(w); }
+  for (const z of [-0.42, 0.42]) { farol(g, 1.31, 0.68, z, [5, 4.6, 3.2]); farol(g, -1.31, 0.68, z, [4, 0.3, 0.3], 0.09); }
+  const feixe = mesh(new THREE.PlaneGeometry(4, 2.2), poolMat, 3.1, 0.06, 0); feixe.rotation.x = -Math.PI / 2; feixe.userData.noShadow = true; g.add(feixe);
+  if (comArvore) { const p = makePine(0.2); p.rotation.z = Math.PI / 2; p.position.set(0.6, 1.85, 0); g.add(p); }
+  return g;
+}
+
+function makeLocomotiva() {
+  const g = new THREE.Group(), preto = mat(0x1d1d24, { roughness: 0.5, metalness: 0.4 }), vermelho = mat(0xb8242c, { roughness: 0.4, metalness: 0.2 }), ouro = mat(0xe8b13a, { metalness: 0.7, roughness: 0.3 });
+  g.add(mesh(rbox(5.2, 0.5, 1.8, 0.1), preto, 0, 0.9, 0));
+  const caldeira = mesh(new THREE.CylinderGeometry(0.8, 0.8, 3.2, 20), vermelho, 0.9, 1.9, 0); caldeira.rotation.z = Math.PI / 2; g.add(caldeira);
+  for (const x of [-0.1, 0.9, 1.9]) { const a = mesh(new THREE.TorusGeometry(0.82, 0.06, 6, 20), ouro, x, 1.9, 0); a.rotation.y = Math.PI / 2; g.add(a); }
+  g.add(mesh(new THREE.CylinderGeometry(0.82, 0.82, 0.2, 20), preto, 2.55, 1.9, 0).rotateZ(Math.PI / 2));
+  g.add(mesh(new THREE.CylinderGeometry(0.3, 0.22, 1.1, 12), preto, 1.9, 3.1, 0));
+  g.add(mesh(new THREE.CylinderGeometry(0.45, 0.3, 0.3, 12), preto, 1.9, 3.7, 0));
+  g.add(mesh(rbox(1.8, 2.2, 1.9, 0.1), vermelho, -1.6, 2.1, 0));
+  g.add(mesh(rbox(2.2, 0.2, 2.2, 0.08), preto, -1.6, 3.3, 0));
+  g.add(mesh(rbox(2.2, 0.25, 2.2, 0.1), snowMat, -1.6, 3.45, 0));
+  for (const z of [-0.96, 0.96]) g.add(mesh(new THREE.PlaneGeometry(0.9, 0.7), glowMat, -1.6, 2.4, z * 1.001).rotateY(z > 0 ? 0 : Math.PI));
+  farol(g, 2.7, 2.5, 0, [5, 4.4, 2.6], 0.22);
+  const limpa = mesh(new THREE.ConeGeometry(0.9, 0.9, 4), ouro, 2.9, 0.7, 0); limpa.rotation.z = -Math.PI / 2; limpa.scale.set(1, 0.7, 1.1); g.add(limpa);
+  for (const x of [-1.6, 0.2, 1.6]) for (const z of [-0.95, 0.95]) { const r = mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.15, 16), vermelho, x, 0.6, z); r.rotation.x = Math.PI / 2; g.add(r); }
+  g.userData.chamine = V3(1.9, 4, 0);
+  return g;
+}
+function makeVagao(carga) {
+  const g = new THREE.Group(), madeira = mat(0x6b4226, { roughness: 0.8 }), preto = mat(0x1d1d24, { roughness: 0.5, metalness: 0.4 });
+  g.add(mesh(rbox(3.6, 0.35, 1.8, 0.08), preto, 0, 0.85, 0));
+  g.add(mesh(rbox(3.6, 0.7, 1.8, 0.08), madeira, 0, 1.35, 0));
+  for (const x of [-1.1, 1.1]) for (const z of [-0.95, 0.95]) { const r = mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.15, 14), preto, x, 0.55, z); r.rotation.x = Math.PI / 2; g.add(r); }
+  if (carga === 'arvore') { const p = makePine(0.45); p.position.set(0, 1.7, 0); g.add(p); }
+  else [[-1, 0.3, 0.9, 0xd8333a, 0xffd166], [0.1, -0.2, 0.8, 0x2f9e5b, 0xffffff], [1.1, 0.25, 0.7, 0x4f7fe0, 0xffd166], [0.2, 0.4, 0.5, 0xf2a93b, 0xd8333a]].forEach(([x, z, s, c, r]) => { const gf = makeGift(s, c, r); gf.position.set(x, 1.7, z); gf.rotation.y = x; g.add(gf); });
+  addString(g, V3(-1.8, 1.75, 0.92), V3(1.8, 1.75, 0.92), 0.15, 10);
+  return g;
+}
+function makeTrem() {
+  const g = new THREE.Group(), loco = makeLocomotiva(); g.add(loco);
+  ['presentes', 'arvore', 'presentes', 'arvore'].forEach((c, i) => { const v = makeVagao(c); v.position.x = -5.4 - i * 4; g.add(v); });
+  g.userData.chamine = loco.userData.chamine;
+  return g;
+}
+
+function makePessoa(casaco, gorro) {
+  const g = new THREE.Group(), skin = mat([0xf3c29b, 0xd9a07a, 0x9c6a48][Math.floor(rnd() * 3)], { roughness: 0.6 }), c = mat(casaco, { roughness: 0.85 });
+  const legs = [-0.14, 0.14].map(x => { const l = new THREE.Group(); l.position.set(x, 0.75, 0); l.add(mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.65, 8), mat(0x2a3048), 0, -0.32, 0)); const b = mesh(new THREE.SphereGeometry(0.13, 8, 6), mat(0x3a2414), 0, -0.68, 0.05); b.scale.set(1, 0.6, 1.4); l.add(b); g.add(l); return l; });
+  g.add(mesh(new THREE.CapsuleGeometry(0.32, 0.55, 4, 12), c, 0, 1.15, 0));
+  const arms = [-1, 1].map(s => { const a = new THREE.Group(); a.position.set(s * 0.36, 1.45, 0); a.add(mesh(new THREE.CapsuleGeometry(0.09, 0.42, 3, 8), c, 0, -0.26, 0)); a.add(mesh(new THREE.SphereGeometry(0.09, 8, 8), mat(0xd8333a), 0, -0.52, 0)); a.rotation.z = s * 0.15; g.add(a); return a; });
+  const cachecol = mesh(new THREE.TorusGeometry(0.22, 0.08, 8, 16), mat(gorro, { roughness: 0.9 }), 0, 1.62, 0); cachecol.rotation.x = Math.PI / 2; g.add(cachecol);
+  g.add(mesh(new THREE.SphereGeometry(0.28, 18, 14), skin, 0, 1.92, 0));
+  for (const s of [-1, 1]) g.add(mesh(new THREE.SphereGeometry(0.035, 6, 6), mat(0x1d1d24), s * 0.1, 1.95, 0.25));
+  const touca = mesh(new THREE.SphereGeometry(0.3, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat(gorro, { roughness: 0.9 }), 0, 1.98, 0); g.add(touca);
+  g.add(mesh(new THREE.SphereGeometry(0.1, 8, 8), snowMat, 0, 2.3, 0));
+  const caixa = makeGift(0.45, 0xd8333a, 0xffd166); caixa.position.set(0, 0.95, 0.42); caixa.visible = false; g.add(caixa);
+  g.userData = { legs, arms, caixa };
+  return shadowAll(g);
+}
+
+function makeEscada() {
+  const g = new THREE.Group(), m = mat(0x8a5a3c, { roughness: 0.8 });
+  for (const x of [-0.35, 0.35]) g.add(mesh(new THREE.BoxGeometry(0.1, 4.2, 0.1), m, x, 2.1, 0));
+  for (let i = 0; i < 8; i++) g.add(mesh(new THREE.BoxGeometry(0.7, 0.07, 0.08), m, 0, 0.35 + i * 0.5, 0));
+  return shadowAll(g);
+}
+
+function makeRena(nariz) {
+  const g = new THREE.Group(), pelo = mat(0x7a4a2a, { roughness: 0.9 }), chifre = mat(0xd8c3a0);
+  const corpo = mesh(new THREE.CapsuleGeometry(0.32, 0.9, 4, 10), pelo, 0, 1.0, 0); corpo.rotation.z = Math.PI / 2; g.add(corpo);
+  for (const x of [-0.4, 0.4]) for (const z of [-0.18, 0.18]) g.add(mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.7, 6), pelo, x, 0.45, z));
+  const pescoco = mesh(new THREE.CylinderGeometry(0.14, 0.18, 0.6, 8), pelo, 0.65, 1.35, 0); pescoco.rotation.z = -0.6; g.add(pescoco);
+  g.add(mesh(new THREE.SphereGeometry(0.22, 12, 10), pelo, 0.9, 1.65, 0));
+  g.add(mesh(new THREE.SphereGeometry(0.12, 8, 8), pelo, 1.1, 1.6, 0));
+  if (nariz) farol(g, 1.22, 1.6, 0, [6, 0.4, 0.3], 0.09); else g.add(mesh(new THREE.SphereGeometry(0.06, 6, 6), mat(0x1d1d24), 1.21, 1.6, 0));
+  for (const z of [-0.12, 0.12]) { const c = mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.5, 5), chifre, 0.85, 2.0, z); c.rotation.x = z * 3; g.add(c); const r = mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.25, 5), chifre, 0.95, 2.1, z * 1.6); r.rotation.z = -0.8; g.add(r); }
+  return g;
+}
+function makeTreno() {
+  const g = new THREE.Group(), vermelho = mat(0xc8202a, { roughness: 0.35, metalness: 0.2 }), ouro = mat(0xe8b13a, { metalness: 0.7, roughness: 0.3 });
+  const treno = new THREE.Group(); g.add(treno);
+  treno.add(mesh(rbox(2.2, 0.8, 1.3, 0.25, 3), vermelho, 0, 0.8, 0));
+  treno.add(mesh(rbox(0.5, 1.2, 1.3, 0.2, 3), vermelho, -1.0, 1.1, 0));
+  for (const z of [-0.6, 0.6]) {
+    treno.add(mesh(new THREE.BoxGeometry(2.8, 0.08, 0.1), ouro, 0.1, 0.2, z));
+    const ponta = mesh(new THREE.TorusGeometry(0.3, 0.05, 6, 12, Math.PI), ouro, 1.5, 0.5, z); ponta.rotation.z = -Math.PI / 2; treno.add(ponta);
+    treno.add(mesh(new THREE.BoxGeometry(2.2, 0.08, 0.06), ouro, 0, 1.2, z * 1.09));
+  }
+  // Papai Noel
+  const noel = new THREE.Group(); noel.position.set(-0.3, 1.0, 0); treno.add(noel);
+  noel.add(mesh(new THREE.SphereGeometry(0.55, 16, 12), vermelho, 0, 0.5, 0));
+  noel.add(mesh(new THREE.TorusGeometry(0.5, 0.08, 6, 20), mat(0x1d1d24), 0, 0.45, 0).rotateX(Math.PI / 2));
+  noel.add(mesh(new THREE.SphereGeometry(0.3, 14, 12), mat(0xf3c29b), 0.05, 1.2, 0));
+  const barba = mesh(new THREE.SphereGeometry(0.3, 12, 10), snowMat, 0.18, 1.0, 0); barba.scale.set(0.8, 1.1, 1); noel.add(barba);
+  noel.add(mesh(new THREE.ConeGeometry(0.3, 0.6, 14), vermelho, -0.05, 1.6, 0).rotateZ(0.5));
+  noel.add(mesh(new THREE.TorusGeometry(0.27, 0.07, 6, 16), snowMat, 0, 1.4, 0).rotateX(Math.PI / 2));
+  noel.add(mesh(new THREE.SphereGeometry(0.1, 8, 8), snowMat, -0.35, 1.85, 0));
+  const braco = mesh(new THREE.CapsuleGeometry(0.1, 0.5, 3, 8), vermelho, 0.45, 0.8, 0.3); braco.rotation.z = -1.2; noel.add(braco);
+  // saco de presentes
+  const saco = mesh(new THREE.SphereGeometry(0.6, 12, 10), mat(0x8a5a3c, { roughness: 0.95 }), -1.0, 1.9, 0); saco.scale.set(1, 1.1, 1); treno.add(saco);
+  const gf = makeGift(0.4, 0x2f9e5b, 0xffd166); gf.position.set(-1.0, 2.4, 0.2); treno.add(gf);
+  // renas
+  const renas = [];
+  [[3.2, -0.5, false], [3.2, 0.5, false], [5.2, -0.5, false], [5.2, 0.5, false], [7.2, 0, true]].forEach(([x, z, n]) => { const r = makeRena(n); r.position.set(x, -0.2, z); r.scale.setScalar(0.85); g.add(r); renas.push(r); });
+  for (const z of [-0.5, 0.5]) { const pts = [V3(1.0, 1.1, z * 0.8), V3(7.4, 1.2, 0)]; g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 4, 0.025, 4), ouro)); }
+  g.userData = { renas, treno };
+  return shadowAll(g);
+}
+
 // ---------- cena ----------
 export async function criarCena(canvas) {
   await Promise.race([document.fonts.load('700 80px Fredoka'), new Promise(r => setTimeout(r, 1500))]).catch(() => {});
@@ -714,11 +831,16 @@ export async function criarCena(canvas) {
 
   // terreno: plano no meio (a vila), morros em volta
   const borda = MEIO * T;
+  // a rua principal atravessa a vila e segue pela floresta; o trem passa lá no fundo
+  const RUA_Z = centroLote(0, RUAS[0].z, 1).z, TRILHO_Z = -42, TRILHO_Y = 0.4;
   const hAt = (x, z) => {
     const d = Math.max(Math.abs(x), Math.abs(z)), S = THREE.MathUtils.smoothstep, dr = Math.hypot(x, z);
     const hill = S(dr, 40, 105) * 20 * (0.7 + 0.3 * Math.sin(x * 0.05 + z * 0.04));
     const n = Math.sin(x * 0.08) * Math.cos(z * 0.07) * 1.8 + Math.sin(x * 0.21 + z * 0.17) * 0.6;
-    return hill + S(d, borda + 6, borda + 30) * n + S(d, borda + 1, borda + 6) * Math.sin(x * 0.35) * Math.sin(z * 0.3) * 0.25;
+    let h = hill + S(d, borda + 6, borda + 30) * n + S(d, borda + 1, borda + 6) * Math.sin(x * 0.35) * Math.sin(z * 0.3) * 0.25;
+    h *= S(Math.abs(z - RUA_Z), 3, 8);
+    const kt = 1 - S(Math.abs(z - TRILHO_Z), 3.5, 10);
+    return h + (TRILHO_Y - h) * kt;
   };
   {
     const geo = new THREE.PlaneGeometry(460, 460, 230, 230); geo.rotateX(-Math.PI / 2);
@@ -736,7 +858,9 @@ export async function criarCena(canvas) {
   // ruas
   for (const r of RUAS) {
     const w = r.w * T, h = r.h * T, c = centroLote(r.x, r.z, 1).add(V3((r.w - 1) * T / 2, 0, (r.h - 1) * T / 2));
-    const alongX = r.w >= r.h, len = alongX ? w : h, wid = (alongX ? h : w) * 0.82;
+    const alongX = r.w >= r.h, wid = (alongX ? h : w) * 0.82;
+    let len = alongX ? w : h;
+    if (r.w === TAMANHO) { len = 320; c.x = 0; }
     const m = new THREE.Mesh(new THREE.PlaneGeometry(wid, len), new THREE.MeshStandardMaterial({ map: rep(roadTex, 1, len / 6), roughness: 0.95 }));
     m.rotation.x = -Math.PI / 2; if (alongX) m.rotation.z = Math.PI / 2; m.position.set(c.x, 0.03, c.z); m.receiveShadow = true; scene.add(m);
   }
@@ -744,13 +868,14 @@ export async function criarCena(canvas) {
   // cerca em volta da vila (com abertura na rua da frente)
   {
     const wm = mat(0x4a3324, { roughness: 0.9 }), posts = [], step = 2.5, e = borda + 1.2;
-    for (let s = -e; s <= e + 0.01; s += step) { posts.push([s, -e], [-e, s], [e, s]); if (Math.abs(s) > 3) posts.push([s, e]); }
+    for (let s = -e; s <= e + 0.01; s += step) { posts.push([s, -e]); if (Math.abs(s - RUA_Z) > 3) posts.push([-e, s], [e, s]); if (Math.abs(s) > 3) posts.push([s, e]); }
     const pGeo = rbox(0.28, 1.5, 0.28, 0.05), cGeo = rbox(0.38, 0.2, 0.38, 0.09);
     const ip = new THREE.InstancedMesh(pGeo, wm, posts.length), ic = new THREE.InstancedMesh(cGeo, snowMat, posts.length), m4 = new THREE.Matrix4();
     posts.forEach(([x, z], i) => { m4.makeTranslation(x, 0.75, z); ip.setMatrixAt(i, m4); m4.makeTranslation(x, 1.58, z); ic.setMatrixAt(i, m4); });
     ip.castShadow = true; scene.add(ip, ic);
     const rail = (x1, z1, x2, z2) => { const len = Math.hypot(x2 - x1, z2 - z1); for (const [y, mm, hh] of [[1.15, wm, 0.18], [0.6, wm, 0.18], [1.28, snowMat, 0.1]]) { const r = mesh(rbox(len, hh, 0.14, 0.04), mm, (x1 + x2) / 2, y, (z1 + z2) / 2); r.rotation.y = -Math.atan2(z2 - z1, x2 - x1); scene.add(r); } };
-    rail(-e, -e, e, -e); rail(-e, -e, -e, e); rail(e, -e, e, e); rail(-e, e, -3.5, e); rail(3.5, e, e, e);
+    rail(-e, -e, e, -e); rail(-e, e, -3.5, e); rail(3.5, e, e, e);
+    for (const x of [-e, e]) { rail(x, -e, x, RUA_Z - 3.2); rail(x, RUA_Z + 3.2, x, e); }
   }
 
   // floresta (instanciada)
@@ -759,6 +884,7 @@ export async function criarCena(canvas) {
     while (pts.length < (coarse ? 380 : 620)) {
       const a = R(0, Math.PI * 2), d = R(borda + 6, 125), x = Math.cos(a) * d, z = Math.sin(a) * d;
       if (Math.max(Math.abs(x), Math.abs(z)) < borda + 5) continue;
+      if (Math.abs(z - RUA_Z) < 6.5 || (z > TRILHO_Z - 7.5 && z < -borda - 3)) continue;
       if (z > borda && Math.abs(x) < 6 && d < 55) continue;
       if (Math.abs(Math.atan2(z, x) - 0.86) < 0.55 && d < 65) continue;
       pts.push([x, z, R(1.0, 2.0) * (d > 60 ? 1.4 : 1)]);
@@ -780,6 +906,51 @@ export async function criarCena(canvas) {
       im.castShadow = true; im.receiveShadow = true; scene.add(im);
     }
   }
+
+  // trilho e trem
+  {
+    const trilhoM = mat(0x6a7080, { metalness: 0.6, roughness: 0.4 });
+    for (const dz of [-0.75, 0.75]) scene.add(mesh(new THREE.BoxGeometry(420, 0.12, 0.12), trilhoM, 0, TRILHO_Y + 0.28, TRILHO_Z + dz));
+    const n = 280, dorm = new THREE.InstancedMesh(new THREE.BoxGeometry(0.4, 0.16, 2.2), mat(0x4a3324, { roughness: 0.9 }), n), m4 = new THREE.Matrix4();
+    for (let i = 0; i < n; i++) { m4.makeTranslation(-210 + i * 1.5, TRILHO_Y + 0.15, TRILHO_Z); dorm.setMatrixAt(i, m4); }
+    dorm.receiveShadow = true; scene.add(dorm);
+  }
+  const trem = makeTrem(); trem.position.set(-200, TRILHO_Y + 0.05, TRILHO_Z); trem.scale.setScalar(1.25); scene.add(trem);
+  const fumacaTrem = [];
+  for (let i = 0; i < 12; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: 0xdfe6f6, transparent: true, depthWrite: false, opacity: 0 })); s.userData.life = i / 12; scene.add(s); fumacaTrem.push(s); }
+
+  // carros na rua principal (dois sentidos)
+  const carros = [];
+  [[0xd8333a, true, 1], [0x2f7ad8, false, -1], [0x2f9e5b, false, 1], [0xf2a93b, true, -1], [0xf4f4f8, false, 1], [0x8a5cc8, false, -1]].forEach(([cor, arv, sent], i) => {
+    const c = makeCar(cor, arv); c.traverse(m => { if (m.isMesh) m.castShadow = !m.userData.noShadow; });
+    c.userData.sentido = sent; c.userData.vel = R(7, 10); c.position.set(-150 + i * 55, 0, RUA_Z + sent * 0.9); c.rotation.y = sent > 0 ? 0 : Math.PI;
+    scene.add(c); carros.push(c);
+  });
+
+  // moradores (passeiam; quando tem enfeite pra pôr na árvore, vão lá pendurar)
+  const escada = makeEscada(); escada.visible = false; scene.add(escada);
+  const moradores = [[0xb8242c, 0xf2f2f2], [0x2f5d9e, 0xffc94d], [0x3a7a4a, 0xd8333a], [0x8a5cc8, 0xf2f2f2]].map(([c, g], i) => {
+    const o = makePessoa(c, g); o.position.set(R(-15, 15), 0, RUA_Z + R(-1.5, 1.5)); scene.add(o);
+    return { obj: o, alvo: o.position.clone(), troca: 0, idx: i };
+  });
+
+  // Papai Noel
+  const treno = makeTreno(); treno.visible = false; treno.scale.setScalar(1.6); scene.add(treno);
+  const noel = { voando: false, rota: [], i: 0, espera: 0, aoChegar: null, alvoAtual: null };
+  const brilhoN = 60, brilhoGeo = new THREE.BufferGeometry(), brilhoPos = new Float32Array(brilhoN * 3), brilhoVida = new Float32Array(brilhoN);
+  brilhoGeo.setAttribute('position', new THREE.BufferAttribute(brilhoPos, 3));
+  const brilho = new THREE.Points(brilhoGeo, new THREE.PointsMaterial({ size: 0.5, map: flakeTex, color: 0xffd76a, transparent: true, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }));
+  scene.add(brilho); let brilhoI = 0;
+  const presentesCaindo = [];
+  function papaiNoel(alvos, aoChegar) {
+    if (noel.voando) return false;
+    const lado = rnd() < 0.5 ? -1 : 1;
+    noel.rota = [{ pos: V3(-150 * lado, 34, -40), id: null }, ...alvos.map(a => ({ pos: a.pos.clone().add(V3(0, 3.2, 0)), id: a.id, chao: a.pos.clone() })), { pos: V3(150 * lado, 38, 50), id: null, fim: true }];
+    noel.i = 1; noel.voando = true; noel.espera = 0; noel.aoChegar = aoChegar;
+    treno.position.copy(noel.rota[0].pos); treno.visible = true;
+    return true;
+  }
+  function chamineDe(id) { const e = predios.get(id); if (!e || !e.obj.userData.smoke) return null; e.obj.updateMatrixWorld(true); return e.obj.localToWorld(e.obj.userData.smoke[0].clone()).add(V3(0, -0.6, 0)); }
 
   // neve caindo
   const flakeN = coarse ? 1800 : 3600;
@@ -1099,9 +1270,103 @@ export async function criarCena(canvas) {
       const f = sala.moveis.get('lareira');
       if (f) { f.obj.userData.fogo.children.forEach((c, i) => { if (c.geometry.type === 'ConeGeometry') c.scale.y = 0.85 + Math.sin(t * 9 + i * 2) * 0.15; }); sala.fogoLuz.intensity = (14 + f.n * 6) * (0.85 + Math.sin(t * 11) * 0.1 + Math.sin(t * 17) * 0.05); }
     }
+    animarVida(dt, t);
     for (const fn of ouvintes) fn(dt);
     composer.render();
     requestAnimationFrame(frame);
+  }
+
+  function andarAte(o, alvo, dt, t, vel, fase) {
+    const u = o.userData, dx = alvo.x - o.position.x, dz = alvo.z - o.position.z, dist = Math.hypot(dx, dz);
+    if (dist > 0.15) {
+      const v = Math.min(dist, dt * vel);
+      o.position.x += dx / dist * v; o.position.z += dz / dist * v; o.rotation.y = Math.atan2(dx, dz);
+      u.legs.forEach((l, i) => l.rotation.x = Math.sin(t * 8 + fase + i * Math.PI) * 0.55);
+      u.arms.forEach((a, i) => { if (!u.carregando) a.rotation.x = Math.sin(t * 8 + fase + i * Math.PI + Math.PI) * 0.45; });
+      return false;
+    }
+    u.legs.forEach(l => l.rotation.x = 0);
+    return true;
+  }
+
+  function animarVida(dt, t) {
+    // trem
+    trem.position.x += dt * 9; if (trem.position.x > 220) trem.position.x = -220;
+    fumacaTrem.forEach(s => {
+      const u = s.userData; u.life += dt * 0.35; if (u.life > 1) u.life -= 1;
+      const base = trem.localToWorld(trem.userData.chamine.clone());
+      s.position.set(base.x - u.life * 7, base.y + u.life * 5, base.z + Math.sin(u.life * 5) * 0.5);
+      const sc = 1 + u.life * 4; s.scale.set(sc, sc, 1); s.material.opacity = Math.sin(u.life * Math.PI) * 0.6;
+    });
+    // carros
+    for (const c of carros) {
+      c.position.x += c.userData.sentido * c.userData.vel * dt;
+      if (c.position.x > 160) c.position.x = -160; if (c.position.x < -160) c.position.x = 160;
+    }
+    // moradores
+    const obra = praca && praca.obra, cPraca = praca ? centroLote(praca.x, praca.z, 4) : V3(0, 0, 0);
+    escada.visible = !!obra;
+    if (obra) { escada.position.set(cPraca.x + 2.0, 0, cPraca.z + 1.4); escada.rotation.set(-0.32, -0.95, 0, 'YXZ'); }
+    for (const m of moradores) {
+      const o = m.obj, u = o.userData;
+      let papel = null;
+      if (obra) papel = m.idx === 0 ? 'escada' : m.idx <= 2 ? 'carrega' : null;
+      u.caixa.visible = false; u.carregando = false;
+      if (papel === 'escada') {
+        const pe = V3(cPraca.x + 2.6, 0, cPraca.z + 2.1);
+        o.position.y = 0;
+        if (andarAte(o, pe, dt, t, 2.6, m.idx)) {
+          o.rotation.y = Math.atan2(cPraca.x - o.position.x, cPraca.z - o.position.z);
+          o.position.y = 1.2 + Math.sin(t * 1.5) * 0.4;
+          u.arms[1].rotation.x = -2.4 + Math.sin(t * 4) * 0.4; u.arms[0].rotation.x = -1.4;
+        }
+      } else if (papel === 'carrega') {
+        // vai e volta entre a pilha de caixas (borda da praça) e a árvore
+        const ciclo = (t * 0.12 + m.idx * 0.5) % 1, ida = ciclo < 0.5;
+        const a = m.idx * 1.9, borda = V3(cPraca.x + Math.cos(a) * 6.5, 0, cPraca.z + Math.sin(a) * 6.5), arvore = V3(cPraca.x + Math.cos(a) * 3.4, 0, cPraca.z + Math.sin(a) * 3.4);
+        u.carregando = ida; u.caixa.visible = ida;
+        if (ida) u.arms.forEach(b => b.rotation.x = -1.1);
+        o.position.y = 0;
+        andarAte(o, ida ? arvore : borda, dt, t, 2.4, m.idx);
+      } else {
+        o.position.y = 0;
+        if (t > m.troca) { m.alvo.set(R(-20, 20), 0, RUA_Z + (rnd() < 0.5 ? -1.6 : 1.6)); if (rnd() < 0.4) { const a = R(0, 6.28); m.alvo.set(cPraca.x + Math.cos(a) * 6, 0, cPraca.z + Math.sin(a) * 6); } m.troca = t + R(6, 12); }
+        if (andarAte(o, m.alvo, dt, t, 1.8, m.idx)) u.arms.forEach(b => b.rotation.x = 0);
+      }
+    }
+    // Papai Noel
+    if (noel.voando) {
+      const alvo = noel.rota[noel.i];
+      if (noel.espera > 0) {
+        noel.espera -= dt;
+        treno.position.y = alvo.pos.y + Math.sin(t * 3) * 0.15;
+        if (noel.espera <= 0) noel.i++;
+      } else {
+        const d = alvo.pos.clone().sub(treno.position), dist = d.length(), v = Math.min(dist, dt * (alvo.fim ? 20 : 16));
+        if (dist > 0.05) {
+          treno.position.addScaledVector(d.normalize(), v);
+          const yaw = Math.atan2(-d.z, d.x), dif = ((yaw - treno.rotation.y + Math.PI) % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
+          treno.rotation.y += THREE.MathUtils.clamp(dif, -dt * 3, dt * 3);
+        } else if (alvo.fim) { noel.voando = false; treno.visible = false; }
+        else if (alvo.id) {
+          noel.espera = 1.3;
+          const gf = makeGift(0.45, [0xd8333a, 0x2f9e5b, 0x4f7fe0][presentesCaindo.length % 3], 0xffd166); gf.position.copy(treno.position).add(V3(0, -0.4, 0)); scene.add(gf);
+          presentesCaindo.push({ obj: gf, ate: alvo.chao.y + 0.4, vida: 1.2 });
+          if (noel.aoChegar) noel.aoChegar(alvo.id);
+        } else noel.i++;
+      }
+      treno.userData.renas.forEach((r, i) => { r.position.y = -0.2 + Math.sin(t * 6 + i) * 0.12; });
+      // rastro de brilho
+      const atras = treno.localToWorld(V3(-1.5, 0.6, 0));
+      brilhoPos[brilhoI * 3] = atras.x + R(-0.3, 0.3); brilhoPos[brilhoI * 3 + 1] = atras.y + R(-0.3, 0.3); brilhoPos[brilhoI * 3 + 2] = atras.z + R(-0.3, 0.3); brilhoVida[brilhoI] = 1;
+      brilhoI = (brilhoI + 1) % brilhoN;
+    }
+    for (let i = 0; i < brilhoN; i++) { if (brilhoVida[i] > 0) { brilhoVida[i] -= dt * 0.8; brilhoPos[i * 3 + 1] -= dt * 0.6; if (brilhoVida[i] <= 0) brilhoPos[i * 3 + 1] = -100; } }
+    brilhoGeo.attributes.position.needsUpdate = true;
+    for (let i = presentesCaindo.length - 1; i >= 0; i--) {
+      const pc = presentesCaindo[i]; pc.obj.position.y -= dt * 4; pc.obj.rotation.y += dt * 4; pc.vida -= dt;
+      if (pc.obj.position.y < pc.ate || pc.vida <= 0) { scene.remove(pc.obj); presentesCaindo.splice(i, 1); }
+    }
   }
 
   addEventListener('resize', () => {
@@ -1112,6 +1377,7 @@ export async function criarCena(canvas) {
   return {
     sincronizar, setFantasma, setDeslocamento, entrarCasa, sairCasa, sincSala, itemEm, posItem, modo: () => modo, setGrade, setSelecionado, esconder, loteEm, predioEm, projetar, topoDe, focar, miniaturas,
     aoQuadro: fn => ouvintes.push(fn),
+    papaiNoel, chamineDe, noelVoando: () => noel.voando,
     controls,
   };
 }

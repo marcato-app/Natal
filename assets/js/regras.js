@@ -21,6 +21,16 @@ export const NIVEIS = [0, 30, 80, 160, 280, 450, 700, 1000];
 
 export const CUSTO_DUENDE = { doces: 40 };
 
+// Aluguel das casas: só casa enfeitada recebe o Papai Noel, que recolhe o aluguel e
+// deixa um presente (doces). Rende a cada ALUGUEL_CICLO segundos, sem precisar de duende.
+export const ALUGUEL_CICLO = 120;
+export const ALUGUEL_BASE = [8, 14, 22];     // moedas por ciclo, por nível da casa
+export const ALUGUEL_POR_ENFEITE = 3;        // + moedas por nível de enfeite da fachada
+export const PRESENTE_DOCES = 2;             // doces por ciclo
+
+// Enfeitar a árvore leva tempo: os moradores vão lá e penduram. Segundos por nível.
+export const TEMPO_ENFEITE = (nivelAtual) => 15 + 15 * nivelAtual;
+
 export const NOMES_DUENDES = [
   'Pipo', 'Lumi', 'Tico', 'Bia', 'Nino', 'Juju', 'Fafá', 'Zeca', 'Mel', 'Bento',
   'Lolo', 'Duda', 'Kiko', 'Nina', 'Teco', 'Lili', 'Gigi', 'Bubu', 'Caju', 'Pituca',
@@ -163,6 +173,19 @@ export function cabe(v, x, z, tam, ignorar = null) {
   return true;
 }
 
+// Soma dos níveis dos enfeites de fachada de uma casa.
+export function enfeitesFachada(p) {
+  const it = p.itens || {};
+  return Object.entries(it).reduce((s, [k, n]) => s + (ITENS[p.tipo]?.[k]?.grupo === 'fachada' ? n : 0), 0);
+}
+
+// Moedas de aluguel por ciclo (0 = casa sem enfeite, o Papai Noel não passa).
+export function aluguelDe(p) {
+  if (p.tipo !== 'casa') return 0;
+  const e = enfeitesFachada(p);
+  return e ? ALUGUEL_BASE[(p.nv || 1) - 1] + ALUGUEL_POR_ENFEITE * e : 0;
+}
+
 // Ciclos inteiros prontos pra coletar.
 export function prontos(p) {
   return Math.floor((p.prog || 0) + 1e-9);
@@ -195,6 +218,13 @@ export function avancar(v, agora) {
   const dt = (agora - v.t) / 1000;
   if (!(dt > 0)) return;
   for (const p of v.predios) {
+    if (p.obra && agora >= p.obra.fim) {
+      const def = ITENS[p.tipo][p.obra.item], n = nivelItem(p, p.obra.item);
+      p.itens = { ...(p.itens || {}), [p.obra.item]: n + 1 };
+      v.alegria += def.alegria[n];
+      delete p.obra;
+    }
+    if (aluguelDe(p)) { p.prog = Math.min(ESTOQUE_MAX, (p.prog || 0) + dt / ALUGUEL_CICLO); continue; }
     const pr = TIPOS[p.tipo].prod;
     if (!pr) continue;
     const n = Math.min(duendesEm(v, p.id), pr.vagas);
@@ -254,6 +284,14 @@ export function aplicar(v, a, agora) {
 
     case 'coletar': {
       const p = predio(v, a.id);
+      if (p && p.tipo === 'casa') {
+        const k = prontos(p);
+        if (k < 1 || !aluguelDe(p)) return erro('Nada pronto ainda');
+        p.prog -= k;
+        const ganho = { moedas: k * aluguelDe(p), doces: k * PRESENTE_DOCES, alegria: k };
+        for (const [r, q] of Object.entries(ganho)) v[r] += q;
+        return { ok: true, ganho };
+      }
       const pr = p && TIPOS[p.tipo].prod;
       if (!pr) return erro('Esse prédio não produz');
       const k = prontos(p);
@@ -307,8 +345,13 @@ export function aplicar(v, a, agora) {
       const motivo = bloqueioItem(v, p, a.item);
       if (motivo) return erro(motivo);
       const def = ITENS[p.tipo][a.item], n = nivelItem(p, a.item);
+      if (p.tipo === 'praca' && p.obra) return erro('Os moradores ainda estão enfeitando');
       if (!podePagar(v, def.custos[n])) return erro('Recursos insuficientes');
       pagar(v, def.custos[n]);
+      if (p.tipo === 'praca') {
+        p.obra = { item: a.item, fim: agora + TEMPO_ENFEITE(n) * 1000 };
+        return { ok: true, obra: p.obra };
+      }
       p.itens = { ...(p.itens || {}), [a.item]: n + 1 };
       v.alegria += def.alegria[n];
       return { ok: true, nivel: n + 1, ganho: { alegria: def.alegria[n] } };

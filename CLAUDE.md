@@ -26,6 +26,24 @@ Three.js (0.160.0) vem do jsDelivr pelo importmap do `index.html`.
   construir/mover, painéis, balões de coleta e a fila de ações pro servidor.
 - `assets/css/jogo.css` — interface (painéis de "vidro noturno").
 
+### Coisas de Natal
+
+- **Árvore da praça** começa só verde. Comprar um enfeite (`ITENS.praca`) abre uma
+  "obra" (`praca.obra = { item, fim }`): os moradores vão até a árvore (um sobe na
+  escada, os outros levam caixas) e o enfeite aparece quando o tempo acaba
+  (`TEMPO_ENFEITE`). Um enfeite por vez.
+- **Casa** melhora em 3 níveis (`TIPOS.casa.melhorias`: ala nova, segundo andar, mais
+  moradia), tem fachada decorável e interior 3D com 8 móveis de 3 níveis
+  (`ITENS.casa`, grupos `fachada` e `moveis`).
+- **Aluguel e Papai Noel**: casa com pelo menos um enfeite de fachada rende aluguel
+  (`aluguelDe()`, acumula em `prog` como a produção). A cada ~18 s o navegador manda
+  o trenó (`cena.papaiNoel`) pelas chaminés das casas com aluguel pronto; em cada uma
+  ele larga um presente e o jogo faz a ação `coletar` daquela casa. Sem casa pronta,
+  ele só passeia de vez em quando.
+- **Vida na vila** (só visual, em `cena.js`): carros na rua principal, que segue pela
+  floresta; trem a vapor com vagões de presentes no trilho atrás da vila; moradores
+  passeando.
+
 ### Como o salvamento funciona
 
 A vila inteira é um JSON (formato em `regras.js`, gravado em `vilas.estado`). O

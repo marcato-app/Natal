@@ -5,7 +5,7 @@
 import {
   TIPOS, CATEGORIAS, CUSTO_DUENDE, ESTOQUE_MAX, ITENS,
   novaVila, aplicar, avancar, cabe, predio, duendesEm, moradia, moradiaDe, prontos, podePagar,
-  nivelItem, bloqueioItem,
+  nivelItem, bloqueioItem, aluguelDe, ALUGUEL_CICLO, PRESENTE_DOCES,
   nivelDe, progressoNivel, alegriaAoConstruir,
 } from './regras.js';
 import { criarCena } from './cena.js';
@@ -258,7 +258,7 @@ function desenharPredio() {
     }
     corpo += `</div>`;
   } else {
-    const chave = JSON.stringify([p.id, p.r, p.nv, p.itens, Math.floor(estado.moedas), Math.floor(estado.doces), nivelDe(estado.alegria), estado.duendes.length, vendaPendente]);
+    const chave = JSON.stringify([p.id, p.r, p.nv, p.itens, p.obra, p.obra ? Math.ceil((p.obra.fim - agora()) / 1000) : 0, prontos(p), Math.floor(estado.moedas), Math.floor(estado.doces), nivelDe(estado.alegria), estado.duendes.length, vendaPendente]);
     if (chave === desenharPredio.chave) return;
     desenharPredio.chave = chave;
   }
@@ -271,11 +271,13 @@ function desenharPredio() {
     else if (nivelDe(estado.alegria) < m.nivelVila) alvo = `<span class="bloq">${svg('i-cadeado')}Vila nível ${m.nivelVila}</span>`;
     else alvo = `<button type="button" class="buy ${podePagar(estado, m.custo) ? '' : 'caro'}" data-acao="melhorar">Aumentar <span class="cost">${custoHtml(m.custo)}</span></button>`;
     corpo += `<div class="melhoria"><div class="item-info"><b>Aumentar a casa</b><small>${m ? `Nível ${nv + 1}: ${t.moradia[nv]} duendes, ${nv === 1 ? 'uma ala nova' : 'segundo andar'} e mais móveis` : `A vila tem lugar pra ${moradia(estado)} duendes`}</small></div>${alvo}</div>`;
+    const alu = aluguelDe(p);
+    corpo += `<p class="info">${alu ? `Aluguel: +${alu} moedas e ${PRESENTE_DOCES} doces a cada ${tempoTexto(ALUGUEL_CICLO)}. O Papai Noel passa, deixa um presente e recolhe pra você. Mais enfeites, mais aluguel.` : 'Enfeite a fachada pra o Papai Noel passar aqui: ele deixa presente e recolhe o aluguel.'}</p>`;
     corpo += `<div class="secao">Fachada</div><div class="itens">${linhasItens(p, 'fachada')}</div>`;
     corpo += `<button type="button" class="cta largo" data-acao="entrar">Entrar e mobiliar</button>`;
   } else if (p.tipo === 'praca') {
     const it = p.itens || {}, total = Object.values(ITENS.praca).reduce((s2, d) => s2 + d.custos.length, 0), feitos = Object.keys(ITENS.praca).reduce((s2, k) => s2 + nivelItem(p, k), 0);
-    $('pd-sub').textContent = feitos === total ? 'Árvore completa!' : `Monte a árvore: ${feitos} de ${total} enfeites`;
+    $('pd-sub').textContent = p.obra ? `Os moradores estão pendurando: ${ITENS.praca[p.obra.item].nome}` : feitos === total ? 'Árvore completa!' : `Os moradores enfeitam a árvore: ${feitos} de ${total} enfeites`;
     corpo += `<div class="itens">${linhasItens(p, 'arvore')}</div>`;
   } else {
     $('pd-sub').textContent = `Decoração · deu +${alegriaAoConstruir(p.tipo)} alegria`;
@@ -321,7 +323,9 @@ function linhasItens(p, grupo) {
     const n = nivelItem(p, k), max = d.custos.length, bloq = bloqueioItem(estado, p, k);
     const dots = Array.from({ length: max }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('');
     let btn;
-    if (n >= max) btn = `<span class="completo">${svg('i-ok')}Completo</span>`;
+    if (p.obra && p.obra.item === k) btn = `<span class="completo">${svg('i-martelo')}Enfeitando ${tempoTexto((p.obra.fim - agora()) / 1000)}</span>`;
+    else if (p.obra && n < max && !bloq) btn = `<span class="bloq">Depois</span>`;
+    else if (n >= max) btn = `<span class="completo">${svg('i-ok')}Completo</span>`;
     else if (bloq) btn = `<span class="bloq">${svg('i-cadeado')}${bloq}</span>`;
     else btn = `<button type="button" class="buy ${podePagar(estado, d.custos[n]) ? '' : 'caro'}" data-item="${k}">${n ? 'Melhorar' : 'Colocar'}<span class="cost">${custoHtml(d.custos[n])}</span></button>`;
     return `<div class="item-row" data-linha="${k}"><div class="item-info"><b>${d.nome}</b><span class="dots" aria-label="nível ${n} de ${max}">${dots}</span><small>${n < max ? `+${d.alegria[n]} alegria` : ''}</small></div>${btn}</div>`;
@@ -330,7 +334,8 @@ function linhasItens(p, grupo) {
 function comprarItem(id, item) {
   const p = predio(estado, id), d = p && ITENS[p.tipo][item];
   const r = agir({ tipo: 'item', id, item });
-  if (r.ok) toast(`${d.nome} ${r.nivel > 1 ? `nível ${r.nivel}` : 'colocado'}! +${r.ganho.alegria} alegria`);
+  if (r.ok && r.obra) toast(`Os moradores foram pendurar: ${d.nome}`);
+  else if (r.ok) toast(`${d.nome} ${r.nivel > 1 ? `nível ${r.nivel}` : 'colocado'}! +${r.ganho.alegria} alegria`);
 }
 
 // Dentro da casa
@@ -417,8 +422,10 @@ function selecionar(id) {
 
 /* ---------- coletar e balões ---------- */
 
-function coletar(id) {
-  const b = baloes.get(id), pos = b ? b.getBoundingClientRect() : null;
+function coletar(id, ponto = null) {
+  const b = baloes.get(id);
+  let pos = b && b.style.visibility !== 'hidden' ? b.getBoundingClientRect() : null;
+  if (ponto) pos = { left: ponto.x, top: ponto.y, width: 0 };
   const r = agir({ tipo: 'coletar', id });
   if (!r.ok) return;
   if (pos) {
@@ -435,11 +442,19 @@ const baloes = new Map();
 function sincBaloes() {
   const vivos = new Set();
   for (const p of estado.predios) {
-    const pr = TIPOS[p.tipo].prod; if (!pr) continue;
-    const k = prontos(p), n = duendesEm(estado, p.id);
-    let html = null, cls = 'balao';
-    if (k >= 1) html = `${svg(ICONE[pr.recurso])}+${fmt(k * pr.qtd)}`;
-    else if (!n) { html = `${svg('i-sono')}sem duendes`; cls += ' parado'; }
+    const pr = TIPOS[p.tipo].prod, aluguel = aluguelDe(p);
+    let html = null, cls = 'balao', rotulo = '';
+    if (p.tipo === 'praca' && p.obra) {
+      html = `${svg('i-martelo')}enfeitando ${tempoTexto((p.obra.fim - agora()) / 1000)}`; cls += ' parado'; rotulo = 'Moradores enfeitando a árvore';
+    } else if (p.tipo === 'casa') {
+      const k = prontos(p);
+      if (aluguel && k >= 1) { html = `${svg('i-moedas')}+${fmt(k * aluguel)}`; rotulo = `Recolher ${fmt(k * aluguel)} moedas de aluguel`; }
+      else if (!aluguel) { html = `${svg('i-alegria')}sem enfeites`; cls += ' parado'; rotulo = 'Casa sem enfeites: o Papai Noel não passa'; }
+    } else if (pr) {
+      const k = prontos(p), n = duendesEm(estado, p.id);
+      if (k >= 1) { html = `${svg(ICONE[pr.recurso])}+${fmt(k * pr.qtd)}`; rotulo = `Coletar ${fmt(k * pr.qtd)} ${NOME_RECURSO[pr.recurso]} de ${TIPOS[p.tipo].nome}`; }
+      else if (!n) { html = `${svg('i-sono')}sem duendes`; cls += ' parado'; rotulo = `${TIPOS[p.tipo].nome} sem duendes`; }
+    }
     if (!html) continue;
     vivos.add(p.id);
     let el = baloes.get(p.id);
@@ -450,7 +465,7 @@ function sincBaloes() {
     }
     if (el.innerHTML !== html) el.innerHTML = html;
     el.className = cls;
-    el.setAttribute('aria-label', k >= 1 ? `Coletar ${fmt(k * pr.qtd)} ${NOME_RECURSO[pr.recurso]} de ${TIPOS[p.tipo].nome}` : `${TIPOS[p.tipo].nome} sem duendes`);
+    el.setAttribute('aria-label', rotulo);
   }
   for (const [id, el] of baloes) if (!vivos.has(id)) { el.remove(); baloes.delete(id); }
 }
@@ -583,7 +598,10 @@ async function iniciar() {
 
   // o tempo passa: produção anda e os balões aparecem
   setInterval(() => {
+    const nivelAntes = nivelDe(estado.alegria), obraAntes = estado.predios.find(p => p.obra);
     avancar(estado, agora());
+    if (obraAntes && !obraAntes.obra) { toast('Os moradores terminaram de enfeitar a árvore!'); cena.sincronizar(estado); }
+    if (nivelDe(estado.alegria) > nivelAntes) subiuNivel(nivelDe(estado.alegria));
     desenharHud();
     sincBaloes();
     if (painel === 'predio') desenharPredio();
@@ -593,6 +611,17 @@ async function iniciar() {
     if (!ls.get(LS_TOKEN) || fila.length || enviando) { if (fila.length) agendarEnvio(0); return; }
     try { receber(await api('GET', '/api/vila')); online = true; desenhar(); } catch { online = false; }
   }, 60000);
+  // Papai Noel: passa pelas casas enfeitadas com aluguel pronto (e de vez em quando só passeia)
+  let semVisita = 0;
+  const chamarNoel = () => {
+    if (cena.noelVoando() || colocando) return;
+    const alvos = estado.predios.filter(p => aluguelDe(p) && prontos(p) >= 1).map(p => ({ id: p.id, pos: cena.chamineDe(p.id) })).filter(a => a.pos);
+    if (!alvos.length && ++semVisita % 5) return;
+    semVisita = 0;
+    cena.papaiNoel(alvos, (id) => { const ch = cena.chamineDe(id), sc = ch && cena.projetar(ch); coletar(id, sc && sc.visivel && !dentro ? sc : null); });
+  };
+  setTimeout(chamarNoel, 6000);
+  setInterval(chamarNoel, 18000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') enviar(); });
 }
 // atalho pros testes automáticos (só no servidor local)
