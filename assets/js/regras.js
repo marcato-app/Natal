@@ -20,7 +20,7 @@ export const RUAS = [
 ];
 
 // Alegria acumulada necessária pra cada nível: índice 0 = nível 1.
-export const NIVEIS = [0, 30, 80, 160, 280, 450, 700, 1000];
+export const NIVEIS = [0, 30, 80, 160, 280, 450, 700, 1000, 1400, 1900, 2500, 3200, 4000, 5000, 6200, 7600, 9200, 11000, 13000, 15500];
 
 export const CUSTO_DUENDE = { doces: 40 };
 
@@ -82,6 +82,19 @@ export const MISSOES = [
   { id: 'estrela', texto: 'Coloque a estrela no topo da árvore', meta: 1, progresso: v => v.predios.some(p => p.tipo === 'praca' && nivelItem(p, 'estrela')) ? 1 : 0, premio: { estrelas: 10 }, foco: 'praca' },
   { id: 'casa2', texto: 'Aumente uma casa pro nível 2', meta: 2, progresso: v => Math.max(1, ...v.predios.filter(p => p.tipo === 'casa').map(p => p.nv || 1)), premio: { estrelas: 5 }, foco: 'casa' },
   { id: 'coletar30', texto: 'Faça 30 coletas', meta: 30, progresso: v => stat(v, 'coletas'), premio: { moedas: 150, doces: 30 } },
+  { id: 'terreno1', texto: 'Compre um terreno pra vila crescer', meta: 1, progresso: v => (v.terrenos || []).length, premio: { estrelas: 5 } },
+  { id: 'pisca5', texto: 'Ponha pisca-pisca em 5 pinheiros', meta: 5, progresso: v => v.predios.filter(p => ['pinheiro', 'abeto', 'espruce'].includes(p.tipo) && nivelItem(p, 'luzes')).length, premio: { moedas: 200 } },
+  { id: 'correio', texto: 'Construa o Correio do Papai Noel', meta: 1, progresso: v => v.predios.filter(p => p.tipo === 'correio' && !p.obra).length, premio: { estrelas: 5 }, foco: 'construir' },
+  { id: 'nivel6', texto: 'Chegue ao nível 6 da vila', meta: 6, progresso: v => nivelDe(v.alegria), premio: { estrelas: 8 } },
+  { id: 'loja', texto: 'Construa a Loja de Brinquedos', meta: 1, progresso: v => v.predios.filter(p => p.tipo === 'loja' && !p.obra).length, premio: { moedas: 400 }, foco: 'construir' },
+  { id: 'estacao', texto: 'Construa a Estação de Trem', meta: 1, progresso: v => v.predios.filter(p => p.tipo === 'estacao' && !p.obra).length, premio: { estrelas: 10 }, foco: 'construir' },
+  { id: 'terreno4', texto: 'Tenha 4 terrenos comprados', meta: 4, progresso: v => (v.terrenos || []).length, premio: { estrelas: 15 } },
+  { id: 'nivel10', texto: 'Chegue ao nível 10 da vila', meta: 10, progresso: v => nivelDe(v.alegria), premio: { estrelas: 15 } },
+  { id: 'roda', texto: 'Construa a Roda-Gigante', meta: 1, progresso: v => v.predios.filter(p => p.tipo === 'roda' && !p.obra).length, premio: { estrelas: 15 }, foco: 'construir' },
+  { id: 'casas3', texto: 'Tenha 3 casas no nível 3', meta: 3, progresso: v => v.predios.filter(p => p.tipo === 'casa' && (p.nv || 1) >= 3).length, premio: { estrelas: 15 } },
+  { id: 'nivel15', texto: 'Chegue ao nível 15 da vila', meta: 15, progresso: v => nivelDe(v.alegria), premio: { estrelas: 25 } },
+  { id: 'castelo', texto: 'Construa o Castelo de Gelo', meta: 1, progresso: v => v.predios.filter(p => p.tipo === 'castelo' && !p.obra).length, premio: { estrelas: 25 }, foco: 'construir' },
+  { id: 'oficina', texto: 'Construa a Oficina do Papai Noel', meta: 1, progresso: v => v.predios.filter(p => p.tipo === 'oficina' && !p.obra).length, premio: { estrelas: 50 }, foco: 'construir' },
   { id: 'arvore', texto: 'Complete todos os enfeites da árvore', meta: 12, progresso: v => somaItens(v, 'praca', 'arvore'), premio: { estrelas: 20 }, foco: 'praca' },
 ];
 // As 3 primeiras missões ainda não resgatadas.
@@ -126,6 +139,24 @@ export const TIPOS = {
   padaria: { nome: 'Padaria de Biscoitos', cat: 'producao', tam: 3, custo: { moedas: 250 }, nivel: 1, tempo: 120, prod: { recurso: 'doces', qtd: 15, ciclo: 90, vagas: 2 } },
   fabrica: { nome: 'Fábrica de Brinquedos', cat: 'producao', tam: 4, custo: { moedas: 400 }, nivel: 2, tempo: 300, prod: { recurso: 'moedas', qtd: 40, ciclo: 60, vagas: 3 } },
   rinque: { nome: 'Rinque de Patinação', cat: 'diversao', tam: 4, custo: { moedas: 600, doces: 50 }, nivel: 3, tempo: 600, prod: { recurso: 'alegria', qtd: 12, ciclo: 120, vagas: 2 } },
+  // ---- liberados do nível 4 ao 20 ----
+  correio: { nome: 'Correio do Papai Noel', cat: 'diversao', tam: 3, custo: { moedas: 800, doces: 40 }, nivel: 4, tempo: 900, prod: { recurso: 'alegria', qtd: 10, ciclo: 180, vagas: 1 } },
+  confeitaria: { nome: 'Confeitaria de Chocolate', cat: 'producao', tam: 3, custo: { moedas: 1100 }, nivel: 5, tempo: 1200, prod: { recurso: 'doces', qtd: 40, ciclo: 240, vagas: 2 } },
+  loja: { nome: 'Loja de Brinquedos', cat: 'producao', tam: 3, custo: { moedas: 1500, doces: 60 }, nivel: 6, tempo: 1500, prod: { recurso: 'moedas', qtd: 110, ciclo: 240, vagas: 2 } },
+  estacao: { nome: 'Estação de Trem', cat: 'producao', tam: 4, custo: { moedas: 2200, doces: 100 }, nivel: 7, tempo: 1800, prod: { recurso: 'moedas', qtd: 260, ciclo: 600, vagas: 3 } },
+  mercado: { nome: 'Mercado de Natal', cat: 'diversao', tam: 4, custo: { moedas: 2600, doces: 120 }, nivel: 8, tempo: 2100, prod: { recurso: 'alegria', qtd: 24, ciclo: 300, vagas: 2 } },
+  renas: { nome: 'Renas de Luz', cat: 'decoracao', tam: 2, custo: { moedas: 400, doces: 30 }, nivel: 9, alegria: 25 },
+  pista: { nome: 'Pista de Trenó', cat: 'diversao', tam: 4, custo: { moedas: 3500, doces: 150 }, nivel: 10, tempo: 2700, prod: { recurso: 'alegria', qtd: 36, ciclo: 480, vagas: 2 } },
+  presepio: { nome: 'Presépio', cat: 'decoracao', tam: 2, custo: { moedas: 700, doces: 50 }, nivel: 11, alegria: 40 },
+  roda: { nome: 'Roda-Gigante', cat: 'diversao', tam: 4, custo: { moedas: 5000, doces: 200 }, nivel: 12, tempo: 3600, prod: { recurso: 'alegria', qtd: 55, ciclo: 600, vagas: 3 } },
+  chafariz: { nome: 'Chafariz Congelado', cat: 'decoracao', tam: 2, custo: { moedas: 1100, doces: 80 }, nivel: 13, alegria: 60 },
+  teatro: { nome: 'Teatro de Natal', cat: 'diversao', tam: 4, custo: { moedas: 7000, doces: 260 }, nivel: 14, tempo: 4500, prod: { recurso: 'alegria', qtd: 80, ciclo: 900, vagas: 3 } },
+  arvoreGigante: { nome: 'Árvore Gigante', cat: 'decoracao', tam: 2, custo: { moedas: 1800, doces: 120 }, nivel: 15, alegria: 95 },
+  castelo: { nome: 'Castelo de Gelo', cat: 'diversao', tam: 4, custo: { moedas: 9500, doces: 350 }, nivel: 16, tempo: 5400, prod: { recurso: 'alegria', qtd: 120, ciclo: 1200, vagas: 3 } },
+  arco: { nome: 'Arco de Luzes', cat: 'decoracao', tam: 2, custo: { moedas: 2600, doces: 150 }, nivel: 17, alegria: 140 },
+  pousada: { nome: 'Pousada da Neve', cat: 'casas', tam: 4, custo: { moedas: 6000, doces: 250 }, nivel: 18, tempo: 3600, moradia: 10 },
+  estatua: { nome: 'Estátua do Papai Noel', cat: 'decoracao', tam: 2, custo: { moedas: 4000, doces: 220 }, nivel: 19, alegria: 200 },
+  oficina: { nome: 'Oficina do Papai Noel', cat: 'producao', tam: 4, custo: { moedas: 15000, doces: 600, estrelas: 50 }, nivel: 20, tempo: 7200, prod: { recurso: 'estrelas', qtd: 3, ciclo: 1800, vagas: 4 } },
   pinheiro: { nome: 'Pinheiro', cat: 'decoracao', tam: 1, custo: { moedas: 15 }, nivel: 1, alegria: 2 },
   abeto: { nome: 'Abeto', cat: 'decoracao', tam: 1, custo: { moedas: 25 }, nivel: 2, alegria: 3 },
   espruce: { nome: 'Espruce Azul', cat: 'decoracao', tam: 1, custo: { moedas: 35 }, nivel: 3, alegria: 4 },

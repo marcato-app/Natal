@@ -20,7 +20,7 @@ const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.floor(n).toLocaleString('pt-BR');
 const ICONE = { moedas: 'i-moedas', doces: 'i-doces', alegria: 'i-alegria', estrelas: 'i-estrela' };
 const svg = (id, cls = '') => `<svg class="${cls}" aria-hidden="true"><use href="#${id}"/></svg>`;
-const NOME_RECURSO = { moedas: 'moedas', doces: 'doces', alegria: 'alegria' };
+const NOME_RECURSO = { moedas: 'moedas', doces: 'doces', alegria: 'alegria', estrelas: 'estrelas' };
 
 /* ------------------------------ estado e servidor ------------------------------ */
 
