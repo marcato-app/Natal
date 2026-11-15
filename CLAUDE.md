@@ -66,6 +66,12 @@ então nada vem de CDN; `sw.js` guarda tudo no aparelho pra abrir offline.
   (`(orientation: landscape) and (max-height: 520px)`): botões numa coluna à direita,
   painéis do lado, e a cena desloca pro lado livre (`setDeslocamento`).
 - **20 níveis** (`NIVEIS`) com prédios novos até o castelo; a oficina produz estrelas.
+- **Igreja** (`igreja`, nível 9, 4×4): o mesmo modelo da igreja do bairro vizinho (`makeIgreja`).
+  **Presépio** com Sagrada Família, boi e burrinho, reis magos, pastor e estrela guia.
+- **Desempenho**: `criarModelo` passa todo prédio por `otimizar()`, que junta as peças paradas
+  de material equivalente (o que está no `userData` fica solto pra animar). No celular a sombra é
+  refeita a cada 2 quadros e no máximo `MAX_ELFOS` duendes aparecem. Em localhost,
+  `__teste.memoria()` mostra os desenhos por quadro e `__teste.pecas()` as peças por tipo.
 
 ### Obras, construtores e estrelas (estilo jogo de construir)
 

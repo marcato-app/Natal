@@ -898,18 +898,69 @@ function makePista() {
   tr.add(caixa(0.8, 0.35, 1.6, mat(0xc8202a, { roughness: 0.4 }), 0, 0.2, 0));
   return finalizar(g, 6);
 }
+// Igreja branca com torre, no estilo das casas (cabe num lote 4x4, frente pra +z).
+function makeIgreja() {
+  const g = new THREE.Group();
+  const par = new THREE.MeshStandardMaterial({ map: rep(rebocoTex, 2, 2), color: 0xf2efe8, roughness: 0.9 }), tel = new THREE.MeshStandardMaterial({ map: rep(telhaTex, 2, 2), color: 0x3c4048, roughness: 0.8 });
+  const ouro = mat(0xe8b13a, { metalness: 0.8, roughness: 0.3 });
+  g.add(caixa(9.4, 0.25, 9.4, MR.pedra, 0, 0.12, 0));
+  // nave
+  g.add(caixa(4.8, 4.2, 6.6, par, 0, 2.35, -1.2));
+  const fr = frontaoR({ w: 4.8, d: 6.6, h: 2.6, parede: par, telha: tel }); fr.position.set(0, 4.45, -1.2); g.add(fr);
+  for (const zz of [-3.2, -1.2, 0.8]) for (const sx of [-1, 1]) { const j = janelaR(0.7, 2.0, 1, 3); j.position.set(sx * 2.41, 2.4, zz); j.rotation.y = sx * Math.PI / 2; g.add(j); }
+  // torre na frente
+  g.add(caixa(2.2, 8.4, 2.2, par, 0, 4.45, 2.6));
+  g.add(caixa(2.5, 0.3, 2.5, MR.preto, 0, 8.7, 2.6));
+  const sino = new THREE.Group(); sino.position.set(0, 7.3, 2.6); g.add(sino);
+  for (const sx of [-1, 1]) { const a = caixa(0.05, 1.1, 0.7, MR.preto, sx * 1.11, 0, 0); sino.add(a); const b = caixa(0.7, 1.1, 0.05, MR.preto, 0, 0, sx * 1.11); sino.add(b); }
+  sino.add(mR(new THREE.CylinderGeometry(0.22, 0.4, 0.6, 12), ouro, 0, -0.1, 0));
+  g.add(mR(new THREE.ConeGeometry(1.75, 4.2, 4), tel, 0, 10.95, 2.6).rotateY(Math.PI / 4));
+  g.add(caixa(0.14, 1.4, 0.14, ouro, 0, 13.7, 2.6)); g.add(caixa(0.8, 0.14, 0.14, ouro, 0, 13.85, 2.6));
+  // porta, degraus e lanternas
+  const porta = janelaR(1.2, 2.3, 2, 3); porta.position.set(0, 1.4, 3.72); g.add(porta);
+  const rosa = mR(new THREE.CircleGeometry(0.45, 20), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.6, 0.9), toneMapped: false }), 0, 4.2, 3.72); g.add(rosa);
+  for (let i = 0; i < 3; i++) g.add(caixa(2.6 - i * 0.3, 0.18, 0.5, MR.pedra, 0, 0.3 + i * 0.18, 4.45 - i * 0.3));
+  for (const sx of [-1, 1]) { const l = lanternaR(); l.position.set(sx * 0.95, 2.0, 3.55); g.add(l); const pj = posteJardim(); pj.position.set(sx * 3.6, 0.25, 4.2); g.add(pj); }
+  ledsFrontao(g, fr);
+  ledsLinha(g, V3(-1.15, 8.95, 3.75), V3(1.15, 8.95, 3.75), 10, ledQuente);
+  for (const sx of [-1, 1]) for (const zz of [2.4, 0.4]) { const a = arbustoR(0.55); a.position.set(sx * 3.1, 0.6, zz); g.add(a); }
+  return finalizar(g, 14);
+}
+
 function makePresepio() {
-  const g = new THREE.Group(), madeira = mat(0x7a4a2a, { roughness: 0.9 });
-  g.add(caixa(4.4, 0.15, 3.6, mat(0xb08a56, { roughness: 1 }), 0, 0.08, 0));
-  for (const x of [-1.8, 1.8]) for (const z of [-1.2, 1.0]) g.add(caixa(0.2, 2.6, 0.2, madeira, x, 1.3, z));
+  const g = new THREE.Group(), madeira = mat(0x7a4a2a, { roughness: 0.9 }), palha = mat(0xc9a25a, { roughness: 1 }), pele = mat(0xe8bf98);
+  g.add(caixa(4.8, 0.15, 4.6, mat(0xb08a56, { roughness: 1 }), 0, 0.08, 0));
+  // estábulo
+  for (const x of [-1.8, 1.8]) for (const z of [-1.6, 0.4]) g.add(caixa(0.2, 2.6, 0.2, madeira, x, 1.3, z));
   const tri = new THREE.Shape(); tri.moveTo(-2.2, 0); tri.lineTo(2.2, 0); tri.lineTo(0, 1.2); tri.closePath();
-  g.add(mR(new THREE.ExtrudeGeometry(tri, { depth: 2.6, bevelEnabled: false }), madeira, 0, 2.6, -1.4));
-  g.add(caixa(4.6, 0.2, 2.8, snowMat, 0, 3.0, -0.1).rotateZ(0.0));
-  g.add(caixa(3.6, 1.8, 0.15, madeira, 0, 1.0, -1.25));
-  const figura = (x, cor, h) => { g.add(mR(new THREE.ConeGeometry(0.3, h, 10), mat(cor, { roughness: 0.9 }), x, h / 2 + 0.15, 0)); g.add(mR(new THREE.SphereGeometry(0.17, 10, 8), mat(0xe8bf98), x, h + 0.25, 0)); };
-  figura(-0.9, 0x3a5a9e, 1.3); figura(0.9, 0x7a4a2a, 1.4);
-  g.add(caixa(0.7, 0.3, 0.4, madeira, 0, 0.3, 0.1)); g.add(mR(new THREE.SphereGeometry(0.15, 8, 6), mat(0xf6f1e4), 0, 0.5, 0.1));
-  g.add(mR(new THREE.SphereGeometry(0.25, 10, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 4, 1.5), toneMapped: false }), 0, 4.2, -0.1));
+  g.add(mR(new THREE.ExtrudeGeometry(tri, { depth: 2.4, bevelEnabled: false }), madeira, 0, 2.6, -1.8));
+  g.add(caixa(4.6, 0.2, 2.6, snowMat, 0, 3.0, -0.5));
+  g.add(caixa(3.6, 1.8, 0.15, madeira, 0, 1.0, -1.65));
+  g.add(caixa(3.4, 0.08, 1.9, palha, 0, 0.19, -0.6));
+  const figura = (x, z, cor, h, ry = 0) => { const f = new THREE.Group(); f.position.set(x, 0.15, z); f.rotation.y = ry; f.add(mR(new THREE.ConeGeometry(0.3 * h / 1.3, h, 10), mat(cor, { roughness: 0.9 }), 0, h / 2, 0)); f.add(mR(new THREE.SphereGeometry(0.17 * h / 1.3, 10, 8), pele, 0, h + 0.1, 0)); g.add(f); return f; };
+  // Maria (manto azul com véu), José (cajado) e o menino na manjedoura
+  const maria = figura(-0.85, -0.5, 0x3a5a9e, 1.2, 0.4); maria.add(mR(new THREE.SphereGeometry(0.2, 10, 8, 0, Math.PI * 2, 0, Math.PI / 1.8), mat(0xe9eef8), 0, 1.33, -0.02));
+  const jose = figura(0.85, -0.5, 0x7a4a2a, 1.4, -0.4); jose.add(caixa(0.06, 1.8, 0.06, madeira, 0.35, 0.9, 0.1));
+  g.add(caixa(0.7, 0.3, 0.4, madeira, 0, 0.3, -0.4)); g.add(caixa(0.6, 0.06, 0.3, palha, 0, 0.47, -0.4));
+  g.add(mR(new THREE.SphereGeometry(0.14, 8, 6), mat(0xf6f1e4), 0, 0.55, -0.4)); g.add(mR(new THREE.SphereGeometry(0.09, 8, 6), pele, 0.12, 0.6, -0.4));
+  // boi e burrinho no fundo
+  const bicho = (x, cor, orelha) => { const b = new THREE.Group(); b.position.set(x, 0.15, -1.2); g.add(b); b.add(caixa(0.9, 0.5, 0.45, mat(cor), 0, 0.6, 0)); b.add(caixa(0.35, 0.35, 0.3, mat(cor), x < 0 ? 0.55 : -0.55, 0.85, 0.1)); for (const lx of [-0.3, 0.3]) for (const lz of [-0.15, 0.15]) b.add(caixa(0.1, 0.4, 0.1, mat(cor), lx, 0.2, lz)); b.add(caixa(0.06, orelha, 0.06, mat(cor), x < 0 ? 0.6 : -0.6, 1.05 + orelha / 2, 0.05)); return b; };
+  bicho(-1.25, 0x8a8a90, 0.3); bicho(1.25, 0x6b4a32, 0.12);
+  // três reis magos chegando, com coroas e presentes
+  const coroa = mat(0xe8b13a, { metalness: 0.8, roughness: 0.3 });
+  [[-1.5, 1.4, 0x8e2a4a], [0, 1.75, 0x2f6a4a], [1.5, 1.4, 0x5a3a8e]].forEach(([x, z, cor]) => {
+    const r = figura(x, z, cor, 1.35, Math.PI + (x ? -x * 0.25 : 0));
+    r.add(mR(new THREE.CylinderGeometry(0.15, 0.13, 0.14, 8), coroa, 0, 1.6, 0));
+    r.add(caixa(0.22, 0.18, 0.22, coroa, 0, 0.75, -0.3));
+  });
+  // pastor com ovelhinhas ao lado
+  const pastor = figura(2.05, 0.9, 0x8a6a3a, 1.2, -1.2); pastor.add(caixa(0.06, 1.6, 0.06, madeira, 0.3, 0.8, 0));
+  for (const [x, z] of [[1.7, 1.9], [2.2, 1.7], [-2.1, 0.6]]) { g.add(mR(new THREE.SphereGeometry(0.22, 10, 8), mat(0xf4f1ea, { roughness: 1 }), x, 0.42, z)); g.add(mR(new THREE.SphereGeometry(0.1, 8, 6), mat(0x2a2a2e), x + 0.2, 0.48, z)); }
+  // estrela guia e luz quente dentro do estábulo
+  const brilho = new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 4, 1.5), toneMapped: false });
+  const estrela = new THREE.Shape(); for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2 + Math.PI / 2, rr = i % 2 ? 0.16 : 0.42; estrela[i ? 'lineTo' : 'moveTo'](Math.cos(a) * rr, Math.sin(a) * rr); }
+  g.add(mR(new THREE.ExtrudeGeometry(estrela, { depth: 0.08, bevelEnabled: false }), brilho, 0, 4.4, -0.5));
+  g.add(mR(new THREE.BoxGeometry(0.16, 0.24, 0.16), MR.lampada, 0, 2.4, -0.7));
   return finalizar(g, 4.8);
 }
 function makeRoda() {
@@ -1081,7 +1132,7 @@ function makeCarReal(cor, comArvore, suv) {
 export const MODELOS = {
   praca: makePlaza, casa: makeHouse, fabrica: makeFactory, padaria: makePadariaReal, rinque: makeRinqueReal,
   correio: makeCorreio, confeitaria: makeConfeitaria, loja: makeLoja, estacao: makeEstacao, mercado: makeMercado, renas: makeRenas,
-  pista: makePista, presepio: makePresepio, roda: makeRoda, chafariz: makeChafariz, teatro: makeTeatro, arvoreGigante: makeArvoreGigante,
+  pista: makePista, presepio: makePresepio, igreja: makeIgreja, roda: makeRoda, chafariz: makeChafariz, teatro: makeTeatro, arvoreGigante: makeArvoreGigante,
   castelo: makeCastelo, arco: makeArco, pousada: makePousada, estatua: makeEstatua, oficina: makeOficina,
   pinheiro: (p) => makePinheiroReal('pinheiro', p?.itens || {}, 0.6), abeto: (p) => makePinheiroReal('abeto', p?.itens || {}, 0.6), espruce: (p) => makePinheiroReal('espruce', p?.itens || {}, 0.6), boneco: makeSnowman, poste: makeLamp, presentes: makeGiftPile,
 };
@@ -1633,18 +1684,11 @@ export async function criarCena(canvas) {
       casa.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
       scene.add(casa);
     }
-    // igreja com torre
-    const ig = new THREE.Group(), x = -(borda + 74), z = RZ - 11; ig.position.set(x, hAt(x, z), z);
-    const par = new THREE.MeshStandardMaterial({ map: rep(rebocoTex, 2, 2), color: 0xf2efe8, roughness: 0.9 }), tel = new THREE.MeshStandardMaterial({ map: rep(telhaTex, 2, 2), color: 0x3c4048, roughness: 0.8 });
-    ig.add(caixa(6, 5, 11, par, 0, 2.5, 0));
-    const fr = frontaoR({ w: 6, d: 11, h: 3.2, parede: par, telha: tel }); fr.position.y = 5; ig.add(fr);
-    ig.add(caixa(2.4, 10, 2.4, par, 0, 5, 6));
-    ig.add(mR(new THREE.ConeGeometry(1.9, 5, 4), tel, 0, 12.5, 6).rotateY(Math.PI / 4));
-    ig.add(caixa(0.12, 1.4, 0.12, mat(0xe8b13a, { metalness: 0.8 }), 0, 15.6, 6)); ig.add(caixa(0.8, 0.12, 0.12, mat(0xe8b13a, { metalness: 0.8 }), 0, 15.8, 6));
-    for (const zz of [-3, 0, 3]) { const j = janelaR(0.9, 2.4, 1, 3); j.position.set(3.01, 2.4, zz); j.rotation.y = Math.PI / 2; ig.add(j); }
-    const porta = janelaR(1.4, 2.6, 2, 3); porta.position.set(0, 1.5, 7.21); ig.add(porta);
-    ledsFrontao(ig, fr);
-    fundir(ig); ig.rotation.y = Math.PI / 2; scene.add(ig);
+    // igreja com torre (o mesmo modelo que o jogador pode construir)
+    const x = -(borda + 74), z = RZ - 11, ig = makeIgreja();
+    ig.position.set(x, hAt(x, z), z); ig.scale.setScalar(1.3); ig.rotation.y = Math.PI / 2;
+    ig.traverse(o => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = true; } });
+    scene.add(ig);
   }
 
   // trilho e trem

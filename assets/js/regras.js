@@ -153,6 +153,7 @@ export const TIPOS = {
   mercado: { nome: 'Mercado de Natal', cat: 'diversao', tam: 4, custo: { moedas: 2600, doces: 120 }, nivel: 8, tempo: 2100, prod: { recurso: 'alegria', qtd: 12, ciclo: 300, vagas: 2 } },
   renas: { nome: 'Renas de Luz', cat: 'decoracao', tam: 2, custo: { moedas: 400, doces: 30 }, nivel: 9, alegria: 25 },
   pista: { nome: 'Pista de Trenó', cat: 'diversao', tam: 4, custo: { moedas: 3500, doces: 150 }, nivel: 10, tempo: 2700, prod: { recurso: 'alegria', qtd: 16, ciclo: 480, vagas: 2 } },
+  igreja: { nome: 'Igreja', cat: 'decoracao', tam: 4, custo: { moedas: 3200, doces: 160 }, nivel: 9, tempo: 1800, alegria: 130 },
   presepio: { nome: 'Presépio', cat: 'decoracao', tam: 2, custo: { moedas: 700, doces: 50 }, nivel: 11, alegria: 40 },
   roda: { nome: 'Roda-Gigante', cat: 'diversao', tam: 4, custo: { moedas: 5000, doces: 200 }, nivel: 12, tempo: 3600, prod: { recurso: 'alegria', qtd: 22, ciclo: 600, vagas: 3 } },
   chafariz: { nome: 'Chafariz Congelado', cat: 'decoracao', tam: 2, custo: { moedas: 1100, doces: 80 }, nivel: 13, alegria: 60 },
