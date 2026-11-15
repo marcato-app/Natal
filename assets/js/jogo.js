@@ -3,8 +3,9 @@
 // regras do Worker (regras.js); o servidor confere e devolve a vila oficial.
 
 import {
-  TIPOS, CATEGORIAS, CUSTO_DUENDE, ESTOQUE_MAX,
-  novaVila, aplicar, avancar, cabe, predio, duendesEm, moradia, prontos, podePagar,
+  TIPOS, CATEGORIAS, CUSTO_DUENDE, ESTOQUE_MAX, ITENS,
+  novaVila, aplicar, avancar, cabe, predio, duendesEm, moradia, moradiaDe, prontos, podePagar,
+  nivelItem, bloqueioItem,
   nivelDe, progressoNivel, alegriaAoConstruir,
 } from './regras.js';
 import { criarCena } from './cena.js';
@@ -155,13 +156,14 @@ function desenhar() {
   if (painel === 'predio') desenharPredio();
   if (painel === 'duendes') desenharDuendes();
   if (painel === 'construir') desenharCards();
+  if (dentro) { const c = predio(estado, dentro); if (c) { cena.sincSala(c); desenharCasa(); } else sair(); }
   sincBaloes();
 }
 
 /* ---------- painéis ---------- */
 
 function abrir(qual) {
-  if (colocando) return;
+  if (colocando || dentro) return;
   painel = qual;
   for (const p of ['construir', 'predio', 'duendes', 'amigos']) $('sheet-' + p).hidden = p !== qual;
   $('nav').hidden = !!qual;
@@ -169,8 +171,18 @@ function abrir(qual) {
   if (qual === 'construir') { desenharAbas(); desenharCards(); }
   if (qual === 'duendes') desenharDuendes();
   if (qual === 'predio') { vendaPendente = false; desenharPredio.chave = null; desenharPredio(); }
+  deslocarCena();
 }
 function fechar() { abrir(null); }
+
+// Com painel aberto, a cena anda pro lado (tela larga) ou pra cima (celular).
+function deslocarCena() {
+  const aberto = painel === 'predio' || painel === 'construir' || !!dentro;
+  if (!aberto) cena.setDeslocamento(0, 0);
+  else if (innerWidth >= 900) cena.setDeslocamento(220, 0);
+  else cena.setDeslocamento(0, Math.round(innerHeight * (dentro ? 0.07 : 0.13)));
+}
+addEventListener('resize', () => cena && deslocarCena());
 
 document.addEventListener('click', (e) => {
   const ab = e.target.closest('[data-abrir]'); if (ab) { abrir(ab.dataset.abrir); return; }
@@ -245,21 +257,26 @@ function desenharPredio() {
       else corpo += `<button type="button" class="slot empty" data-abrir="duendes">+ Duende<small>nenhum livre</small></button>`;
     }
     corpo += `</div>`;
-  } else if (t.moradia) {
-    const chave = JSON.stringify([p.id, p.r, estado.duendes.length, moradia(estado), vendaPendente]);
-    if (chave === desenharPredio.chave) return;
-    desenharPredio.chave = chave;
-    $('pd-sub').textContent = `Moradia pra ${t.moradia} duendes`;
-    corpo += `<p class="info">A vila tem lugar pra ${moradia(estado)} duendes e hoje tem ${estado.duendes.length}. Mais casas, mais duendes.</p>`;
   } else {
-    const chave = JSON.stringify([p.id, p.r, vendaPendente]);
+    const chave = JSON.stringify([p.id, p.r, p.nv, p.itens, Math.floor(estado.moedas), Math.floor(estado.doces), nivelDe(estado.alegria), estado.duendes.length, vendaPendente]);
     if (chave === desenharPredio.chave) return;
     desenharPredio.chave = chave;
   }
-  if (t.prod || t.moradia) { /* já preenchido acima */ }
-  else if (p.tipo === 'praca') {
-    $('pd-sub').textContent = 'O coração da vila';
-    corpo += `<p class="info">Duendes sem trabalho passeiam por aqui.</p>`;
+  if (t.prod) { /* já preenchido acima */ }
+  else if (p.tipo === 'casa') {
+    const nv = p.nv || 1, m = t.melhorias[nv - 1];
+    $('pd-sub').textContent = `Nível ${nv} · abriga ${moradiaDe(p)} duendes`;
+    let alvo;
+    if (!m) alvo = `<span class="completo">${svg('i-ok')}Nível máximo</span>`;
+    else if (nivelDe(estado.alegria) < m.nivelVila) alvo = `<span class="bloq">${svg('i-cadeado')}Vila nível ${m.nivelVila}</span>`;
+    else alvo = `<button type="button" class="buy ${podePagar(estado, m.custo) ? '' : 'caro'}" data-acao="melhorar">Aumentar <span class="cost">${custoHtml(m.custo)}</span></button>`;
+    corpo += `<div class="melhoria"><div class="item-info"><b>Aumentar a casa</b><small>${m ? `Nível ${nv + 1}: ${t.moradia[nv]} duendes, ${nv === 1 ? 'uma ala nova' : 'segundo andar'} e mais móveis` : `A vila tem lugar pra ${moradia(estado)} duendes`}</small></div>${alvo}</div>`;
+    corpo += `<div class="secao">Fachada</div><div class="itens">${linhasItens(p, 'fachada')}</div>`;
+    corpo += `<button type="button" class="cta largo" data-acao="entrar">Entrar e mobiliar</button>`;
+  } else if (p.tipo === 'praca') {
+    const it = p.itens || {}, total = Object.values(ITENS.praca).reduce((s2, d) => s2 + d.custos.length, 0), feitos = Object.keys(ITENS.praca).reduce((s2, k) => s2 + nivelItem(p, k), 0);
+    $('pd-sub').textContent = feitos === total ? 'Árvore completa!' : `Monte a árvore: ${feitos} de ${total} enfeites`;
+    corpo += `<div class="itens">${linhasItens(p, 'arvore')}</div>`;
   } else {
     $('pd-sub').textContent = `Decoração · deu +${alegriaAoConstruir(p.tipo)} alegria`;
   }
@@ -279,6 +296,10 @@ function desenharPredio() {
   $('pd-acoes').firstElementChild?.classList.contains('cta') && ($('pd-acoes').firstElementChild.style.gridColumn = '1 / -1');
 }
 $('pd-corpo').addEventListener('click', (e) => {
+  const it = e.target.closest('[data-item]'); if (it) { comprarItem(selecionado, it.dataset.item); return; }
+  const ac = e.target.closest('[data-acao]');
+  if (ac && ac.dataset.acao === 'melhorar') { const r = agir({ tipo: 'melhorar', id: selecionado }); if (r.ok) toast(`Casa aumentada! +${r.ganho.alegria} alegria`); return; }
+  if (ac && ac.dataset.acao === 'entrar') { entrar(selecionado); return; }
   const tirar = e.target.closest('[data-tirar]'); if (tirar) { agir({ tipo: 'alocar', duende: tirar.dataset.tirar, predio: null }); return; }
   const col = e.target.closest('[data-colocar]'); if (col) agir({ tipo: 'alocar', duende: col.dataset.colocar, predio: selecionado });
 });
@@ -287,12 +308,84 @@ $('pd-acoes').addEventListener('click', (e) => {
   const p = predio(estado, selecionado); if (!p) return;
   switch (b.dataset.acao) {
     case 'coletar': coletar(p.id); break;
-    case 'mover': comecarColocar({ tipo: p.tipo, moverId: p.id, x: p.x, z: p.z, r: p.r }); break;
+    case 'mover': comecarColocar({ tipo: p.tipo, moverId: p.id, x: p.x, z: p.z, r: p.r, modelo: p }); break;
     case 'girar': agir({ tipo: 'mover', id: p.id, x: p.x, z: p.z, r: (p.r + 1) & 3 }); break;
     case 'vender': vendaPendente = true; desenharPredio(); break;
     case 'vender-ok': { const r = agir({ tipo: 'vender', id: p.id }); if (r.ok) { toast(`Vendido! ${Object.entries(r.ganho).map(([k, v]) => `+${fmt(v)} ${k}`).join(' ')}`); fechar(); } break; }
   }
 });
+
+// Itens (enfeites da árvore, fachada, móveis)
+function linhasItens(p, grupo) {
+  return Object.entries(ITENS[p.tipo]).filter(([, d]) => d.grupo === grupo).map(([k, d]) => {
+    const n = nivelItem(p, k), max = d.custos.length, bloq = bloqueioItem(estado, p, k);
+    const dots = Array.from({ length: max }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('');
+    let btn;
+    if (n >= max) btn = `<span class="completo">${svg('i-ok')}Completo</span>`;
+    else if (bloq) btn = `<span class="bloq">${svg('i-cadeado')}${bloq}</span>`;
+    else btn = `<button type="button" class="buy ${podePagar(estado, d.custos[n]) ? '' : 'caro'}" data-item="${k}">${n ? 'Melhorar' : 'Colocar'}<span class="cost">${custoHtml(d.custos[n])}</span></button>`;
+    return `<div class="item-row" data-linha="${k}"><div class="item-info"><b>${d.nome}</b><span class="dots" aria-label="nível ${n} de ${max}">${dots}</span><small>${n < max ? `+${d.alegria[n]} alegria` : ''}</small></div>${btn}</div>`;
+  }).join('');
+}
+function comprarItem(id, item) {
+  const p = predio(estado, id), d = p && ITENS[p.tipo][item];
+  const r = agir({ tipo: 'item', id, item });
+  if (r.ok) toast(`${d.nome} ${r.nivel > 1 ? `nível ${r.nivel}` : 'colocado'}! +${r.ganho.alegria} alegria`);
+}
+
+// Dentro da casa
+let dentro = null;
+function entrar(id) {
+  const p = predio(estado, id); if (!p) return;
+  fechar();
+  dentro = id;
+  cena.entrarCasa(p);
+  $('nav').hidden = true; $('sheet-casa').hidden = false;
+  deslocarCena();
+  desenharCasa.chave = null; desenharCasa();
+}
+function sair() {
+  const id = dentro;
+  dentro = null; cena.sairCasa(); deslocarCena();
+  $('sheet-casa').hidden = true; $('nav').hidden = false;
+  for (const el of bolhasCasa.values()) el.remove();
+  bolhasCasa.clear();
+  if (id && predio(estado, id)) selecionar(id);
+}
+$('cs-sair').addEventListener('click', sair);
+function desenharCasa() {
+  const p = predio(estado, dentro); if (!p) return;
+  const chave = JSON.stringify([p.nv, p.itens, Math.floor(estado.moedas), Math.floor(estado.doces)]);
+  if (chave === desenharCasa.chave) return;
+  desenharCasa.chave = chave;
+  const feitos = Object.entries(ITENS.casa).filter(([, d]) => d.grupo === 'moveis').reduce((s2, [k]) => s2 + nivelItem(p, k), 0);
+  $('cs-sub').textContent = `Casa nível ${p.nv || 1} · ${feitos} melhorias de móveis`;
+  $('cs-itens').innerHTML = linhasItens(p, 'moveis');
+  sincBolhasCasa();
+}
+$('cs-itens').addEventListener('click', (e) => { const b = e.target.closest('[data-item]'); if (b) comprarItem(dentro, b.dataset.item); });
+function focarLinha(k) {
+  const l = document.querySelector(`#cs-itens [data-linha="${k}"]`); if (!l) return;
+  l.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  l.classList.add('flash'); setTimeout(() => l.classList.remove('flash'), 900);
+}
+const bolhasCasa = new Map();
+function sincBolhasCasa() {
+  const p = predio(estado, dentro); if (!p) return;
+  const vivos = new Set();
+  for (const k of Object.keys(ITENS.casa)) {
+    if (ITENS.casa[k].grupo !== 'moveis' || nivelItem(p, k) || bloqueioItem(estado, p, k)) continue;
+    vivos.add(k);
+    if (!bolhasCasa.has(k)) {
+      const el = document.createElement('button'); el.type = 'button'; el.className = 'balao mais';
+      el.setAttribute('aria-label', `Colocar ${ITENS.casa[k].nome}`);
+      el.innerHTML = `<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="#3a2a10" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`;
+      el.addEventListener('click', () => focarLinha(k));
+      $('baloes').appendChild(el); bolhasCasa.set(k, el);
+    }
+  }
+  for (const [k, el] of bolhasCasa) if (!vivos.has(k)) { el.remove(); bolhasCasa.delete(k); }
+}
 
 // Duendes
 function desenharDuendes() {
@@ -318,6 +411,8 @@ function selecionar(id) {
   selecionado = id;
   abrir('predio');
   cena.setSelecionado(id);
+  const tp = predio(estado, id)?.tipo;
+  if (tp === 'praca' || tp === 'casa') cena.focar(id);
 }
 
 /* ---------- coletar e balões ---------- */
@@ -360,7 +455,13 @@ function sincBaloes() {
   for (const [id, el] of baloes) if (!vivos.has(id)) { el.remove(); baloes.delete(id); }
 }
 function posicionarBaloes() {
+  for (const [k, el] of bolhasCasa) {
+    const s2 = cena.projetar(cena.posItem(k));
+    el.style.visibility = s2.visivel ? 'visible' : 'hidden';
+    el.style.transform = `translate(${s2.x}px, ${s2.y}px) translate(-50%, calc(-100% - 8px))`;
+  }
   for (const [id, el] of baloes) {
+    if (dentro) { el.style.visibility = 'hidden'; continue; }
     const top = cena.topoDe(id);
     const s = top && cena.projetar(top);
     const esconder = !s || !s.visivel || (colocando && colocando.moverId === id);
@@ -382,7 +483,7 @@ function lugarLivre(tipo, perto) {
   return melhor;
 }
 
-function comecarColocar({ tipo, moverId = null, x, z, r = 0 }) {
+function comecarColocar({ tipo, moverId = null, x, z, r = 0, modelo = null }) {
   fechar();
   if (x === undefined) {
     const meio = cena.loteEm(innerWidth / 2, innerHeight * 0.58) || { fx: 9, fz: 13 };
@@ -390,7 +491,7 @@ function comecarColocar({ tipo, moverId = null, x, z, r = 0 }) {
     if (!l) { toast('Não tem mais espaço na vila'); return; }
     ({ x, z } = l);
   }
-  colocando = { tipo, moverId, x, z, r };
+  colocando = { tipo, moverId, x, z, r, modelo };
   $('nav').hidden = true; $('place').hidden = false;
   $('place-nome').textContent = (moverId ? 'Movendo: ' : '') + TIPOS[tipo].nome;
   cena.setGrade(true);
@@ -399,7 +500,7 @@ function comecarColocar({ tipo, moverId = null, x, z, r = 0 }) {
 }
 function atualizarFantasma() {
   const c = colocando, ok = cabe(estado, c.x, c.z, TIPOS[c.tipo].tam, c.moverId);
-  cena.setFantasma(c.tipo, c.x, c.z, c.r, ok);
+  cena.setFantasma(c.tipo, c.x, c.z, c.r, ok, c.modelo);
   $('place-ok').disabled = !ok;
 }
 function terminarColocar() {
@@ -443,12 +544,13 @@ function ligarToques(canvas) {
   }, { capture: true });
   canvas.addEventListener('pointermove', (e) => { if (arrastando) moverFantasmaPara(e.clientX, e.clientY); });
   const up = (e) => {
-    if (arrastando) { arrastando = false; cena.controls.enabled = true; down = null; return; }
+    if (arrastando) { arrastando = false; if (!dentro) cena.controls.enabled = true; down = null; return; }
     if (!down) return;
     const tap = Math.hypot(e.clientX - down.x, e.clientY - down.y) < 8 && performance.now() - down.t < 500;
     down = null;
     if (!tap) return;
     if (colocando) { moverFantasmaPara(e.clientX, e.clientY); return; }
+    if (dentro) { const k = cena.itemEm(e.clientX, e.clientY); if (k) focarLinha(k); return; }
     const id = cena.predioEm(e.clientX, e.clientY);
     if (id) {
       const p = predio(estado, id), pr = p && TIPOS[p.tipo].prod;
@@ -493,4 +595,7 @@ async function iniciar() {
   }, 60000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') enviar(); });
 }
+// atalho pros testes automáticos (só no servidor local)
+if (location.hostname === 'localhost') window.__teste = { selecionarTipo: (t) => selecionar(estado.predios.find(p => p.tipo === t).id) };
+
 iniciar();

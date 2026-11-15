@@ -36,7 +36,14 @@ export const RECURSOS = {
 // prod.ciclo em segundos; prod.vagas = duendes pra produzir na velocidade máxima.
 export const TIPOS = {
   praca: { nome: 'Praça da Árvore', cat: null, tam: 4, custo: {}, nivel: 1, vendavel: false },
-  casa: { nome: 'Casinha', cat: 'casas', tam: 3, custo: { moedas: 150 }, nivel: 1, moradia: 4 },
+  casa: {
+    nome: 'Casinha', cat: 'casas', tam: 3, custo: { moedas: 150 }, nivel: 1,
+    moradia: [4, 6, 8], // por nível da casa
+    melhorias: [         // melhorias[n-1] leva do nível n ao n+1
+      { custo: { moedas: 300, doces: 30 }, nivelVila: 2, alegria: 10 },
+      { custo: { moedas: 700, doces: 80 }, nivelVila: 4, alegria: 20 },
+    ],
+  },
   padaria: { nome: 'Padaria de Biscoitos', cat: 'producao', tam: 3, custo: { moedas: 250 }, nivel: 1, prod: { recurso: 'doces', qtd: 15, ciclo: 90, vagas: 2 } },
   fabrica: { nome: 'Fábrica de Brinquedos', cat: 'producao', tam: 4, custo: { moedas: 400 }, nivel: 2, prod: { recurso: 'moedas', qtd: 40, ciclo: 60, vagas: 3 } },
   rinque: { nome: 'Rinque de Patinação', cat: 'diversao', tam: 4, custo: { moedas: 600, doces: 50 }, nivel: 3, prod: { recurso: 'alegria', qtd: 12, ciclo: 120, vagas: 2 } },
@@ -44,6 +51,33 @@ export const TIPOS = {
   boneco: { nome: 'Boneco de Neve', cat: 'decoracao', tam: 1, custo: { moedas: 30 }, nivel: 1, alegria: 5 },
   poste: { nome: 'Poste de Luz', cat: 'decoracao', tam: 1, custo: { moedas: 40 }, nivel: 2, alegria: 6 },
   presentes: { nome: 'Pilha de Presentes', cat: 'decoracao', tam: 1, custo: { moedas: 60, doces: 10 }, nivel: 2, alegria: 10 },
+};
+
+// Itens comprados dentro de um prédio: enfeites da árvore, decoração da fachada e
+// móveis. custos[n] leva o item do nível n ao n+1 (0 = ainda não tem) e dá alegria[n].
+// nivelCasa: nível mínimo da casa pra ter o item. precisa: outro item que vem antes.
+export const ITENS = {
+  praca: {
+    luzes: { nome: 'Pisca-pisca', grupo: 'arvore', custos: [{ moedas: 20 }, { moedas: 60 }, { moedas: 150 }], alegria: [3, 5, 8] },
+    bolas: { nome: 'Bolas coloridas', grupo: 'arvore', custos: [{ moedas: 30 }, { moedas: 80 }, { moedas: 180, doces: 10 }], alegria: [3, 6, 9] },
+    festao: { nome: 'Festão dourado', grupo: 'arvore', custos: [{ moedas: 50 }, { moedas: 140, doces: 15 }], alegria: [4, 8] },
+    presentes: { nome: 'Presentes embaixo', grupo: 'arvore', custos: [{ moedas: 40, doces: 5 }, { moedas: 100, doces: 15 }, { moedas: 220, doces: 30 }], alegria: [4, 7, 10] },
+    estrela: { nome: 'Estrela no topo', grupo: 'arvore', custos: [{ moedas: 120, doces: 20 }], alegria: [15], precisa: 'luzes' },
+  },
+  casa: {
+    pisca: { nome: 'Pisca-pisca no telhado', grupo: 'fachada', custos: [{ moedas: 25 }, { moedas: 70 }], alegria: [2, 4] },
+    guirlanda: { nome: 'Guirlanda na porta', grupo: 'fachada', custos: [{ moedas: 20 }], alegria: [2] },
+    velas: { nome: 'Velas nas janelas', grupo: 'fachada', custos: [{ moedas: 35 }], alegria: [3] },
+    jardim: { nome: 'Jardim de inverno', grupo: 'fachada', custos: [{ moedas: 60 }, { moedas: 140, doces: 10 }], alegria: [4, 6] },
+    lareira: { nome: 'Lareira', grupo: 'moveis', custos: [{ moedas: 40 }, { moedas: 120 }, { moedas: 260, doces: 20 }], alegria: [3, 6, 10] },
+    sofa: { nome: 'Sofá', grupo: 'moveis', custos: [{ moedas: 30 }, { moedas: 90 }, { moedas: 200, doces: 15 }], alegria: [2, 5, 8] },
+    mesa: { nome: 'Mesa de biscoitos', grupo: 'moveis', custos: [{ moedas: 25, doces: 5 }, { moedas: 80, doces: 10 }, { moedas: 180, doces: 25 }], alegria: [2, 5, 8] },
+    tapete: { nome: 'Tapete', grupo: 'moveis', custos: [{ moedas: 15 }, { moedas: 50 }, { moedas: 120 }], alegria: [1, 3, 5] },
+    cama: { nome: 'Cama quentinha', grupo: 'moveis', custos: [{ moedas: 60 }, { moedas: 150 }, { moedas: 300, doces: 25 }], alegria: [3, 6, 10], nivelCasa: 2 },
+    estante: { nome: 'Estante de livros', grupo: 'moveis', custos: [{ moedas: 50 }, { moedas: 130 }, { moedas: 280 }], alegria: [3, 5, 9], nivelCasa: 2 },
+    poltrona: { nome: 'Poltrona', grupo: 'moveis', custos: [{ moedas: 70 }, { moedas: 170 }, { moedas: 320, doces: 20 }], alegria: [3, 6, 10], nivelCasa: 3 },
+    arvorinha: { nome: 'Arvorezinha', grupo: 'moveis', custos: [{ moedas: 80, doces: 10 }, { moedas: 200, doces: 20 }, { moedas: 380, doces: 40 }], alegria: [4, 8, 12], nivelCasa: 3 },
+  },
 };
 
 export const CATEGORIAS = [
@@ -73,8 +107,29 @@ export function alegriaAoConstruir(tipo) {
   return t.alegria ?? Math.floor((t.custo.moedas || 0) / 50);
 }
 
+// Moradia de um prédio (casas crescem com o nível).
+export function moradiaDe(p) {
+  const m = TIPOS[p.tipo].moradia;
+  return Array.isArray(m) ? m[(p.nv || 1) - 1] : (m || 0);
+}
+
 export function moradia(v) {
-  return v.predios.reduce((s, p) => s + (TIPOS[p.tipo].moradia || 0), 0);
+  return v.predios.reduce((s, p) => s + moradiaDe(p), 0);
+}
+
+export function nivelItem(p, item) {
+  return (p.itens && p.itens[item]) || 0;
+}
+
+// Por que o item não pode ser comprado/melhorado agora (null = pode, sem olhar o preço).
+export function bloqueioItem(v, p, item) {
+  const def = ITENS[p.tipo] && ITENS[p.tipo][item];
+  if (!def) return 'Item desconhecido';
+  const n = nivelItem(p, item);
+  if (n >= def.custos.length) return 'Já está no máximo';
+  if (def.nivelCasa && (p.nv || 1) < def.nivelCasa) return `Precisa da casa nível ${def.nivelCasa}`;
+  if (def.precisa && !nivelItem(p, def.precisa)) return `Precisa de ${ITENS[p.tipo][def.precisa].nome} antes`;
+  return null;
 }
 
 export function duendesEm(v, predioId) {
@@ -121,7 +176,7 @@ export function novaVila(agora) {
     moedas: 500, doces: 60, alegria: 0,
     predios: [], duendes: [],
   };
-  const add = (tipo, x, z) => { const p = { id: 'p' + (++v.seq), tipo, x, z, r: 0, prog: 0 }; v.predios.push(p); return p; };
+  const add = (tipo, x, z) => { const p = { id: 'p' + (++v.seq), tipo, x, z, r: 0, prog: 0 }; if (ITENS[tipo]) p.itens = {}; if (TIPOS[tipo].melhorias) p.nv = 1; v.predios.push(p); return p; };
   add('praca', 7, 6);
   add('casa', 2, 7);
   const fab = add('fabrica', 13, 6);
@@ -168,6 +223,8 @@ export function aplicar(v, a, agora) {
       if (!cabe(v, a.x, a.z, t.tam)) return erro('Não cabe aqui');
       pagar(v, t.custo);
       const p = { id: 'p' + (++v.seq), tipo: a.predio, x: a.x, z: a.z, r: (a.r | 0) & 3, prog: 0 };
+      if (ITENS[a.predio]) p.itens = {};
+      if (t.melhorias) p.nv = 1;
       v.predios.push(p);
       const ganho = alegriaAoConstruir(a.predio);
       v.alegria += ganho;
@@ -187,7 +244,7 @@ export function aplicar(v, a, agora) {
       if (!p) return erro('Prédio não encontrado');
       const t = TIPOS[p.tipo];
       if (t.vendavel === false) return erro('Esse não dá pra vender');
-      if (t.moradia && moradia(v) - t.moradia < v.duendes.length) return erro('Os duendes precisam de onde morar');
+      if (t.moradia && moradia(v) - moradiaDe(p) < v.duendes.length) return erro('Os duendes precisam de onde morar');
       const devolve = {};
       for (const [r, q] of Object.entries(t.custo)) { devolve[r] = Math.floor(q / 2); v[r] += devolve[r]; }
       for (const d of v.duendes) if (d.predio === p.id) d.predio = null;
@@ -227,6 +284,34 @@ export function aplicar(v, a, agora) {
       if (d.predio !== p.id && duendesEm(v, p.id) >= pr.vagas) return erro('Sem vaga nesse prédio');
       d.predio = p.id;
       return { ok: true };
+    }
+
+    case 'melhorar': {
+      const p = predio(v, a.id);
+      const ms = p && TIPOS[p.tipo].melhorias;
+      if (!ms) return erro('Esse prédio não melhora');
+      const m = ms[(p.nv || 1) - 1];
+      if (!m) return erro('Já está no nível máximo');
+      if (nivelDe(v.alegria) < m.nivelVila) return erro(`Precisa da vila no nível ${m.nivelVila}`);
+      if (!podePagar(v, m.custo)) return erro('Recursos insuficientes');
+      pagar(v, m.custo);
+      p.nv = (p.nv || 1) + 1;
+      v.alegria += m.alegria;
+      return { ok: true, ganho: { alegria: m.alegria } };
+    }
+
+    case 'item': {
+      const p = predio(v, a.id);
+      if (!p) return erro('Prédio não encontrado');
+      if (typeof a.item !== 'string' || !ITENS[p.tipo] || !Object.hasOwn(ITENS[p.tipo], a.item)) return erro('Item desconhecido');
+      const motivo = bloqueioItem(v, p, a.item);
+      if (motivo) return erro(motivo);
+      const def = ITENS[p.tipo][a.item], n = nivelItem(p, a.item);
+      if (!podePagar(v, def.custos[n])) return erro('Recursos insuficientes');
+      pagar(v, def.custos[n]);
+      p.itens = { ...(p.itens || {}), [a.item]: n + 1 };
+      v.alegria += def.alegria[n];
+      return { ok: true, nivel: n + 1, ganho: { alegria: def.alegria[n] } };
     }
 
     default:

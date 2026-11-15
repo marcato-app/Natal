@@ -3,7 +3,7 @@
 //   node test/regras.test.mjs
 
 import {
-  novaVila, aplicar, avancar, cabe, moradia, prontos, nivelDe, TIPOS, ESTOQUE_MAX, CUSTO_DUENDE,
+  ITENS, bloqueioItem, novaVila, aplicar, avancar, cabe, moradia, prontos, nivelDe, TIPOS, ESTOQUE_MAX, CUSTO_DUENDE,
 } from '../assets/js/regras.js';
 
 let pass = 0, fail = 0;
@@ -110,6 +110,44 @@ const fab = (v) => v.predios.find(p => p.tipo === 'fabrica');
   acoes.forEach((x, i) => { aplicar(a, x, seg(i * 30)); aplicar(b, structuredClone(x), seg(i * 30)); });
   check('mesmas ações, mesma vila', JSON.stringify(a) === JSON.stringify(b));
   check('ids previsíveis (p10 = padaria, d11 = duende novo)', a.predios.some(p => p.id === 'p10' && p.tipo === 'padaria') && a.duendes.some(d => d.id === 'd11' && d.predio === 'p10'));
+}
+
+// árvore da praça: se monta comprando enfeites
+{
+  const v = novaVila(T0); v.moedas = 5000; v.doces = 500;
+  const pr = v.predios.find(p => p.tipo === 'praca');
+  check('árvore começa sem enfeites', Object.keys(pr.itens).length === 0);
+  check('estrela precisa do pisca-pisca antes', aplicar(v, { tipo: 'item', id: pr.id, item: 'estrela' }, T0).erro.includes('Pisca'));
+  const a0 = v.alegria, m0 = v.moedas;
+  check('compra pisca-pisca', aplicar(v, { tipo: 'item', id: pr.id, item: 'luzes' }, T0).ok && pr.itens.luzes === 1);
+  check('cobra e dá alegria', m0 - v.moedas === 20 && v.alegria - a0 === 3);
+  aplicar(v, { tipo: 'item', id: pr.id, item: 'luzes' }, T0); aplicar(v, { tipo: 'item', id: pr.id, item: 'luzes' }, T0);
+  check('pisca-pisca vai até o nível 3', pr.itens.luzes === 3);
+  check('não passa do máximo', aplicar(v, { tipo: 'item', id: pr.id, item: 'luzes' }, T0).erro === 'Já está no máximo');
+  check('agora coloca a estrela', aplicar(v, { tipo: 'item', id: pr.id, item: 'estrela' }, T0).ok);
+  check('item de outro prédio é recusado', !aplicar(v, { tipo: 'item', id: pr.id, item: 'sofa' }, T0).ok);
+  check('item com nome esquisito é recusado', !aplicar(v, { tipo: 'item', id: pr.id, item: 'toString' }, T0).ok);
+}
+
+// casa: melhorar, fachada e móveis
+{
+  const v = novaVila(T0); v.moedas = 5000; v.doces = 500;
+  const casa = v.predios.find(p => p.tipo === 'casa');
+  check('casa começa no nível 1', casa.nv === 1 && moradia(v) === 4);
+  check('cama precisa da casa nível 2', bloqueioItem(v, casa, 'cama').includes('nível 2'));
+  check('melhorar precisa da vila no nível 2', aplicar(v, { tipo: 'melhorar', id: casa.id }, T0).erro.includes('nível 2'));
+  v.alegria = 30;
+  check('melhora a casa', aplicar(v, { tipo: 'melhorar', id: casa.id }, T0).ok && casa.nv === 2);
+  check('casa nível 2 abriga 6', moradia(v) === 6);
+  check('agora pode ter cama', aplicar(v, { tipo: 'item', id: casa.id, item: 'cama' }, T0).ok);
+  check('nível 3 precisa da vila nível 4', aplicar(v, { tipo: 'melhorar', id: casa.id }, T0).erro.includes('nível 4'));
+  v.alegria = 1000;
+  aplicar(v, { tipo: 'melhorar', id: casa.id }, T0);
+  check('nível máximo 3', casa.nv === 3 && aplicar(v, { tipo: 'melhorar', id: casa.id }, T0).erro.includes('máximo'));
+  check('fachada: guirlanda', aplicar(v, { tipo: 'item', id: casa.id, item: 'guirlanda' }, T0).ok);
+  check('decoração continua depois de mover', aplicar(v, { tipo: 'mover', id: casa.id, x: 2, z: 12, r: 1 }, T0).ok && casa.itens.guirlanda === 1 && casa.itens.cama === 1);
+  check('fábrica não melhora (por enquanto)', !aplicar(v, { tipo: 'melhorar', id: fab(v).id }, T0).ok);
+  check('todos os itens têm custos e alegria do mesmo tamanho', Object.values(ITENS).every(g => Object.values(g).every(d => d.custos.length === d.alegria.length)));
 }
 
 check('ação desconhecida falha', !aplicar(novaVila(T0), { tipo: 'hackear' }, T0).ok);
