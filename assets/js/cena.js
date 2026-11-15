@@ -10,6 +10,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { TAMANHO, RUAS, TIPOS, ITENS, MAPA_MIN, MAPA_MAX, TERRENOS } from './regras.js';
 
 export const T = 2.5; // tamanho de um lote em unidades do mundo
@@ -208,71 +209,268 @@ function candle() {
   const f = mesh(new THREE.SphereGeometry(0.07, 8, 6), bulbMat.clone(), 0, 0.38, 0); f.scale.y = 1.6; f.material.color.setRGB(5, 3, 1.2); g.add(f);
   return g;
 }
-function makeHouse(p = {}) {
-  const nv = p.nv || 1, it = p.itens || {};
-  const g = new THREE.Group(), base = 0.4;
-  const logs = (x, y) => new THREE.MeshStandardMaterial({ map: rep(logsTex, x, y), roughness: 0.85 });
-  const corpo = (w, d, H, x, z, com) => {
-    const c = new THREE.Group(); c.position.set(x, 0, z);
-    c.add(mesh(rbox(w + 0.4, base, d + 0.4, 0.12), mat(0x7d8597, { roughness: 0.95 }), 0, base / 2, 0));
-    c.add(mesh(rbox(w, H, d, 0.18, 3), logs(w / 3.2, H / 2.2), 0, base + H / 2, 0));
-    for (const sx of [-1, 1]) for (const sz of [-1, 1]) c.add(mesh(new THREE.CylinderGeometry(0.22, 0.22, H, 10), mat(0x5e3a22), sx * w / 2, base + H / 2, sz * d / 2));
-    const roof = gableRoof({ w, d, h: com.h, oh: 0.6, gableMat: logs(0.3, 0.3), trim: 0x8a2f2b });
-    roof.position.y = base + H; c.add(roof);
-    c.userData.eave = roof.userData.eave; c.userData.H = H;
-    g.add(c); return c;
-  };
-  // corpo principal (sempre de frente pro +z)
-  const W = 5.4, D = 4.6, H = nv >= 3 ? 5.8 : 3.3, mx = nv >= 2 ? 0.9 : 0;
-  const main = corpo(W, D, H, mx, 0, { h: 2.3 });
-  const janelas = [];
-  const fy = base + 1.85;
-  main.add(mesh(rbox(1.3, 2.3, 0.25, 0.08), new THREE.MeshStandardMaterial({ map: plankTex, color: 0xd08a6a, roughness: 0.8 }), 0, base + 1.15, D / 2 + 0.08));
-  for (const x of [-1.7, 1.7]) { const wn = makeWindow(1, 1.2); wn.position.set(x, fy, D / 2 + 0.02); main.add(wn); janelas.push([main, x, fy, D / 2]); }
-  if (nv >= 3) {
-    for (const x of [-1.7, 0, 1.7]) { const wn = makeWindow(0.9, 1.1); wn.position.set(x, base + 4.4, D / 2 + 0.02); main.add(wn); janelas.push([main, x, base + 4.4, D / 2]); }
-    // varanda sobre a porta
-    main.add(mesh(rbox(3.2, 0.25, 1.6, 0.08), mat(0x8a2f2b), 0, base + 2.75, D / 2 + 0.75));
-    main.add(mesh(rbox(3.4, 0.3, 1.8, 0.14), snowMat, 0, base + 2.95, D / 2 + 0.75));
-    for (const x of [-1.4, 1.4]) main.add(mesh(new THREE.CylinderGeometry(0.1, 0.1, 2.6, 8), mat(0xf1ece2), x, base + 1.35, D / 2 + 1.45));
+// ---------- casa realista (estilo das fotos de referência, em noite de Natal) ----------
+// Reboco/siding claro, telhado escuro com testeira preta, janelas pretas acesas,
+// pórtico com colunas, garagem e varanda com grade. Cresce com o nível:
+// 1 = casa térrea com frontão, 2 = ganha garagem, 3 = sobrado com varanda.
+// Cada casa tem uma variante (cor da parede, do telhado e lado da garagem) tirada do id.
+const sidingTex = tex(256, 256, (g, w, h) => {
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h);
+  for (let y = 0; y < h; y += 32) { const gr = g.createLinearGradient(0, y, 0, y + 32); gr.addColorStop(0, 'rgba(0,0,0,0.13)'); gr.addColorStop(0.14, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(255,255,255,0.04)'); g.fillStyle = gr; g.fillRect(0, y, w, 32); }
+  for (let i = 0; i < 1500; i++) { g.fillStyle = `rgba(0,0,0,${R(0, 0.025)})`; g.fillRect(R(0, w), R(0, h), 2, 1); }
+});
+const rebocoTex = tex(256, 256, (g, w, h) => { g.fillStyle = '#ffffff'; g.fillRect(0, 0, w, h); for (let i = 0; i < 4000; i++) { g.fillStyle = `rgba(0,0,0,${R(0, 0.035)})`; g.fillRect(R(0, w), R(0, h), R(1, 3), R(1, 3)); } });
+const telhaTex = tex(256, 256, (g, w, h) => {
+  g.fillStyle = '#bdbdbd'; g.fillRect(0, 0, w, h);
+  for (let y = 0; y < h; y += 16) for (let x = -32; x < w + 32; x += 32) {
+    const off = (y / 16) % 2 ? 16 : 0; g.fillStyle = `hsl(0,0%,${70 + R(-12, 10)}%)`; g.fillRect(x + off + 1, y + 1, 30, 14);
+    g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(x + off, y + 13, 32, 3);
   }
-  const side = makeWindow(1, 1.2); side.position.set(W / 2 + 0.02, fy, 0); side.rotation.y = Math.PI / 2; main.add(side);
-  main.add(mesh(rbox(0.9, 3, 0.9, 0.1), mat(0x8f97a8, { roughness: 0.95 }), 1.6, base + H + 1.9, -1));
-  main.add(mesh(rbox(1.2, 0.36, 1.2, 0.15), snowMat, 1.6, base + H + 3.45, -1));
-  g.userData.smoke = [V3(mx + 1.6, base + H + 3.8, -1)];
-  // ala lateral (nível 2+)
-  let ala = null;
-  if (nv >= 2) {
-    ala = corpo(2.6, 3.4, 2.6, -2.45, -0.5, { h: 1.7 });
-    const wn = makeWindow(0.9, 1); wn.position.set(0, base + 1.5, 1.72); ala.add(wn); janelas.push([ala, 0, base + 1.5, 1.7]);
-  }
-  // fachada
-  if (it.guirlanda) {
-    main.add(mesh(new THREE.TorusGeometry(0.34, 0.12, 8, 20), mat(0x2f7a46, { roughness: 0.9 }), 0, base + 1.75, D / 2 + 0.26));
-    main.add(mesh(new THREE.SphereGeometry(0.1, 8, 8), mat(0xd8333a), 0, base + 1.45, D / 2 + 0.36));
-  }
-  if (it.pisca) {
-    const e = main.userData.eave;
-    addString(main, V3(-e.x, base + H + e.y, e.z), V3(e.x, base + H + e.y, e.z), 0.35, 20);
-    if (it.pisca >= 2) {
-      addString(main, V3(-e.x, base + H + e.y, -e.z), V3(e.x, base + H + e.y, -e.z), 0.35, 20);
-      addString(main, V3(-W / 2 - 0.1, base + 0.5, D / 2 + 0.1), V3(-W / 2 - 0.1, base + H - 0.3, D / 2 + 0.1), 0.0, 8);
-      addString(main, V3(W / 2 + 0.1, base + 0.5, D / 2 + 0.1), V3(W / 2 + 0.1, base + H - 0.3, D / 2 + 0.1), 0.0, 8);
-      if (ala) { const ea = ala.userData.eave; addString(ala, V3(-ea.x, base + 2.6 + ea.y, ea.z), V3(ea.x, base + 2.6 + ea.y, ea.z), 0.2, 10); }
-    }
-  }
-  if (it.velas) for (const [alvo, x, y, z] of janelas) { const c = candle(); c.position.set(x, y - 0.62, z + 0.3); alvo.add(c); }
-  if (it.jardim) {
-    for (const x of [-2.9, 2.9]) { const pn = makePine(0.32); pn.position.set(mx + x, 0, D / 2 + 1.2); g.add(pn); }
-    if (it.jardim >= 2) {
-      const gp = makeGiftPile(); gp.scale.setScalar(0.8); gp.position.set(mx + 1.9, 0, D / 2 + 1.5); g.add(gp);
-      const l = makeLamp(); l.scale.setScalar(0.55); l.position.set(mx - 1.6, 0, D / 2 + 1.6); g.add(l);
-    }
-  }
-  addPool(g, mx, D / 2 + 1.6, 5.5);
-  g.userData.altura = nv >= 3 ? 10.5 : 7.5;
+});
+const pedraTex = tex(256, 256, (g, w, h) => {
+  g.fillStyle = '#cfc4ae'; g.fillRect(0, 0, w, h);
+  for (let i = 0; i < 14; i++) { const x = R(0, w), y = R(0, h), r = R(22, 46); g.fillStyle = `hsl(38,${R(15, 28)}%,${R(70, 82)}%)`; g.beginPath(); for (let k = 0; k < 7; k++) { const a = k / 7 * 6.28, rr = r * R(0.7, 1.1); k ? g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr) : g.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); } g.closePath(); g.fill(); g.strokeStyle = 'rgba(80,60,40,0.3)'; g.lineWidth = 2; g.stroke(); }
+});
+const VARIANTES = [
+  { parede: 0xf4f3ef, telhado: 0x4a4d55 }, { parede: 0xefe4d2, telhado: 0x4b3f38 },
+  { parede: 0xe2e7ec, telhado: 0x3c4048 }, { parede: 0xf6f1e8, telhado: 0x5a3e36 }, { parede: 0xdfe3da, telhado: 0x3f4a44 },
+];
+const MR = {
+  branco: mat(0xf5f5f2, { roughness: 0.6 }),
+  preto: mat(0x17181c, { roughness: 0.45, metalness: 0.4 }),
+  vidro: new THREE.MeshStandardMaterial({ color: 0xffd9a0, emissive: 0xffa652, emissiveIntensity: 1.5, roughness: 0.2 }),
+  calcada: mat(0xdcdcd8, { roughness: 0.9 }),
+  pedra: new THREE.MeshStandardMaterial({ map: rep(pedraTex, 1, 1), roughness: 0.9 }),
+  folha: mat(0x2f5a2c, { roughness: 0.95 }),
+  folha2: mat(0x24472a, { roughness: 0.95 }),
+  garagem: mat(0x1d1f24, { roughness: 0.5, metalness: 0.3 }),
+  lampada: new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 3.6, 2), toneMapped: false }),
+  ledBranco: new THREE.MeshBasicMaterial({ color: new THREE.Color(4.5, 3.6, 2.2), toneMapped: false }),
+};
+const matParede = new Map(), matReboco = new Map(), matTelha = new Map();
+const deCor = (mapa, cor, criar) => { if (!mapa.has(cor)) mapa.set(cor, criar()); return mapa.get(cor); };
+function hashId(id) { let h = 0; for (const c of String(id)) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); }
+
+function mR(geo, m, x = 0, y = 0, z = 0) { const o = new THREE.Mesh(geo, m); o.position.set(x, y, z); return o; }
+const caixa = (w, h, d, m, x, y, z) => mR(new THREE.BoxGeometry(w, h, d), m, x, y, z);
+
+function janelaR(w, h, cols, rows) {
+  const g = new THREE.Group();
+  g.add(mR(new THREE.PlaneGeometry(w, h), MR.vidro, 0, 0, 0.01));
+  g.add(caixa(w + 0.16, 0.12, 0.14, MR.preto, 0, h / 2, 0.05)); g.add(caixa(w + 0.16, 0.12, 0.14, MR.preto, 0, -h / 2, 0.05));
+  g.add(caixa(0.12, h, 0.14, MR.preto, -w / 2, 0, 0.05)); g.add(caixa(0.12, h, 0.14, MR.preto, w / 2, 0, 0.05));
+  for (let i = 1; i < cols; i++) g.add(caixa(0.05, h, 0.08, MR.preto, -w / 2 + i * w / cols, 0, 0.04));
+  for (let i = 1; i < rows; i++) g.add(caixa(w, 0.05, 0.08, MR.preto, 0, -h / 2 + i * h / rows, 0.04));
+  g.add(caixa(w + 0.4, 0.1, 0.3, MR.branco, 0, -h / 2 - 0.1, 0.12));
+  g.add(caixa(w + 0.5, 0.14, 0.42, snowMat, 0, -h / 2 - 0.02, 0.16));
   return g;
 }
+function lanternaR() {
+  const g = new THREE.Group();
+  g.add(caixa(0.22, 0.36, 0.22, MR.preto, 0, 0, 0.2));
+  g.add(mR(new THREE.BoxGeometry(0.15, 0.25, 0.15), MR.lampada, 0, 0, 0.2));
+  return g;
+}
+// frontão (cumeeira ao longo de z, triângulo virado pra frente) com telhado, neve e testeira preta
+function frontaoR({ w, d, h, beiral = 0.45, parede, telha }) {
+  const g = new THREE.Group(), a = w / 2, th = Math.atan2(h, a), L = Math.hypot(a, h) + beiral;
+  const tri = new THREE.Shape(); tri.moveTo(-a, 0); tri.lineTo(a, 0); tri.lineTo(0, h); tri.closePath();
+  g.add(mR(new THREE.ExtrudeGeometry(tri, { depth: d, bevelEnabled: false }), parede, 0, 0, -d / 2));
+  for (const s of [-1, 1]) {
+    const cx = s * (a + beiral * Math.cos(th)) / 2, cy = (h - beiral * Math.sin(th)) / 2, nx = s * Math.sin(th), ny = Math.cos(th);
+    const agua = caixa(L, 0.16, d + beiral * 2, telha, cx + nx * 0.08, cy + ny * 0.08, 0); agua.rotation.z = -s * th; g.add(agua);
+    const nv = caixa(L, 0.2, d + beiral * 2, snowMat, cx + nx * 0.26, cy + ny * 0.26, 0); nv.rotation.z = -s * th; g.add(nv);
+    for (const zz of [d / 2 + beiral + 0.02, -d / 2 - beiral - 0.02]) { const fx = caixa(L + 0.1, 0.32, 0.12, MR.preto, cx + nx * 0.05, cy + ny * 0.05, zz); fx.rotation.z = -s * th; g.add(fx); }
+  }
+  g.userData.beiral = { a, th, beiral, h, d };
+  return g;
+}
+function telhadoXR(o) { const g = frontaoR({ ...o, w: o.d, d: o.w }); g.rotation.y = Math.PI / 2; return g; }
+// LEDs presos na testeira do frontão (coordenadas locais do grupo pai do frontão)
+function ledsFrontao(pai, fr) {
+  const { a, th, beiral, h, d } = fr.userData.beiral, b = fr.position, z = b.z + d / 2 + beiral + 0.1;
+  const e = V3(b.x - (a + beiral * Math.cos(th)), b.y - beiral * Math.sin(th) - 0.12, z), topo = V3(b.x, b.y + h + 0.02, z), dd = V3(b.x + a + beiral * Math.cos(th), e.y, z);
+  ledsLinha(pai, e, topo, 22); ledsLinha(pai, topo, dd, 22);
+}
+function ledsLinha(pai, p0, p1, n, mat_ = MR.ledBranco) {
+  const im = new THREE.InstancedMesh(new THREE.SphereGeometry(0.06, 6, 4), mat_, n + 1), m4 = new THREE.Matrix4();
+  for (let i = 0; i <= n; i++) { const p = p0.clone().lerp(p1, i / n); m4.makeTranslation(p.x, p.y, p.z); im.setMatrixAt(i, m4); }
+  im.userData.noShadow = true; pai.add(im);
+}
+function guirlandaR(r = 0.4) {
+  const g = new THREE.Group(), verde = mat(0x24502e, { roughness: 0.95 }), laco = mat(0xb3202a, { roughness: 0.5 });
+  g.add(mR(new THREE.TorusGeometry(r, r * 0.3, 8, 20), verde));
+  g.add(mR(new THREE.SphereGeometry(r * 0.24, 8, 8), laco, 0, -r, 0.08));
+  return g;
+}
+function arbustoR(r, cor = MR.folha) {
+  const geo = new THREE.IcosahedronGeometry(r, 2), p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = 1 + Math.sin(x * 9) * Math.sin(y * 11) * Math.sin(z * 7) * 0.08; p.setXYZ(i, x * k, y * k * 0.88, z * k); }
+  geo.computeVertexNormals();
+  return mR(geo, cor);
+}
+function conePinheiro(r, h, cor = MR.folha2) {
+  const geo = new THREE.ConeGeometry(r, h, 18, 8), p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) { const x = p.getX(i), y = p.getY(i), z = p.getZ(i), k = 1 + Math.sin(y * 6 + Math.atan2(z, x) * 5) * 0.07; p.setXYZ(i, x * k, y, z * k); }
+  geo.computeVertexNormals();
+  const o = mR(geo, cor); o.position.y = h / 2; return o;
+}
+function posteJardim() {
+  const g = new THREE.Group();
+  g.add(mR(new THREE.CylinderGeometry(0.05, 0.07, 1.4, 8), MR.preto, 0, 0.7, 0));
+  g.add(caixa(0.22, 0.3, 0.22, MR.preto, 0, 1.5, 0));
+  g.add(mR(new THREE.BoxGeometry(0.16, 0.22, 0.16), MR.lampada, 0, 1.5, 0));
+  return g;
+}
+function carroEsportivo(cor) {
+  const g = new THREE.Group();
+  const lado = new THREE.Shape();
+  lado.moveTo(-2.2, 0.25); lado.lineTo(2.1, 0.25); lado.quadraticCurveTo(2.35, 0.3, 2.3, 0.55); lado.quadraticCurveTo(1.8, 0.75, 0.9, 0.85);
+  lado.quadraticCurveTo(0.2, 1.3, -0.7, 1.25); lado.quadraticCurveTo(-1.6, 1.1, -2.15, 0.85); lado.quadraticCurveTo(-2.3, 0.5, -2.2, 0.25);
+  g.add(mR(new THREE.ExtrudeGeometry(lado, { depth: 1.7, bevelEnabled: true, bevelThickness: 0.18, bevelSize: 0.16, bevelSegments: 3, curveSegments: 10 }), mat(cor, { roughness: 0.25, metalness: 0.5 }), 0, 0, -0.85));
+  const vid = new THREE.Shape(); vid.moveTo(0.75, 0.9); vid.quadraticCurveTo(0.15, 1.27, -0.65, 1.22); vid.quadraticCurveTo(-1.3, 1.1, -1.55, 0.95); vid.lineTo(0.75, 0.9);
+  g.add(mR(new THREE.ExtrudeGeometry(vid, { depth: 1.5, bevelEnabled: true, bevelThickness: 0.08, bevelSize: 0.06, bevelSegments: 2 }), vidroMat, 0, 0.03, -0.75));
+  const aro = mat(0xd8dade, { metalness: 1, roughness: 0.25 });
+  for (const x of [-1.4, 1.45]) for (const z of [-0.95, 0.95]) {
+    const r = mR(new THREE.CylinderGeometry(0.38, 0.38, 0.28, 16), pneuMat, x, 0.38, z); r.rotation.x = Math.PI / 2; g.add(r);
+    const a = mR(new THREE.CylinderGeometry(0.25, 0.25, 0.3, 10), aro, x, 0.38, z); a.rotation.x = Math.PI / 2; g.add(a);
+  }
+  for (const z of [-0.6, 0.6]) g.add(mR(new THREE.SphereGeometry(0.1, 8, 6), MR.lampada, 2.35, 0.55, z));
+  g.add(caixa(1.6, 0.15, 0.9, snowMat, -0.4, 1.32, 0));
+  return g;
+}
+
+function makeHouse(p = {}) {
+  const nv = p.nv || 1, it = p.itens || {}, hv = hashId(p.id || 'vitrine'), var_ = VARIANTES[hv % VARIANTES.length];
+  const s = (hv >> 3) % 2 ? 1 : -1; // lado da garagem
+  const parede = deCor(matParede, var_.parede, () => new THREE.MeshStandardMaterial({ map: rep(sidingTex, 3, 1.5), color: var_.parede, roughness: 0.85 }));
+  const reboco = deCor(matReboco, var_.parede, () => new THREE.MeshStandardMaterial({ map: rep(rebocoTex, 2, 2), color: var_.parede, roughness: 0.9 }));
+  const telha = deCor(matTelha, var_.telhado, () => new THREE.MeshStandardMaterial({ map: rep(telhaTex, 2, 2), color: var_.telhado, roughness: 0.8 }));
+  const casa = new THREE.Group(); // em unidades "de referência"; no fim escala 0.5 pra caber em 3x3 lotes
+  const base = 0.35, janelas = [], leds = !!it.pisca;
+  const ala = new THREE.Group();
+  // ala principal com frontão grande
+  const alaX = nv === 1 ? 0 : nv === 2 ? -3.4 * s : -4.6 * s;
+  ala.position.x = alaX; casa.add(ala);
+  ala.add(caixa(5.6, 4.6, 8, reboco, 0, base + 2.3, 0));
+  const fr = frontaoR({ w: 5.6, d: 8, h: 2.8, parede, telha }); fr.position.y = base + 4.6; ala.add(fr);
+  ala.add(caixa(5.8, 0.18, 0.25, MR.branco, 0, 4.0, 4.05));
+  const portaNaAla = nv === 1;
+  const xsJ = portaNaAla ? [-1.7, 1.7] : [-1.6, 0, 1.6];
+  for (const x of xsJ) { const j = janelaR(1.2, 2.6, 2, 4); j.position.set(x, 2.3, 4.02); ala.add(j); janelas.push([ala, x, 2.3 - 1.3, 4.02]); }
+  for (const x of [-2.75, 2.75]) ala.add(caixa(0.4, 4.4, 0.4, MR.branco, x, base + 2.2, 4.0));
+  if (leds) ledsFrontao(ala, fr);
+  // entrada (pórtico com colunas e porta de vidro alta)
+  const ent = new THREE.Group(); casa.add(ent);
+  if (portaNaAla) ent.position.set(0, 0, 4.0); else if (nv === 2) ent.position.set(alaX + 3.6 * s, 0, 3.4); else ent.position.set(-2.0 * s + 2.2 * s, 0, 3.0);
+  const porta = janelaR(1.6, 3.0, 2, 4); porta.position.set(0, base + 1.5, 0.05); ent.add(porta);
+  for (const x of [-1.25, 1.25]) { ent.add(caixa(0.4, 3.9, 0.4, MR.branco, x, base + 1.95, 1.4)); ent.add(caixa(0.6, 0.8, 0.6, MR.branco, x, base + 0.4, 1.4)); }
+  ent.add(caixa(3.2, 0.3, 1.9, MR.branco, 0, base + 4.0, 0.75));
+  ent.add(caixa(3.4, 0.12, 2.1, MR.preto, 0, base + 4.2, 0.75));
+  ent.add(caixa(3.5, 0.2, 2.2, snowMat, 0, base + 4.32, 0.75));
+  ent.add(caixa(2.8, 0.2, 2.0, MR.calcada, 0, base + 0.1, 1.0));
+  if (it.guirlanda) { const gl = guirlandaR(0.4); gl.position.set(0, base + 2.4, 0.2); ent.add(gl); }
+  if (leds) ledsLinha(ent, V3(-1.6, base + 4.05, 1.75), V3(1.6, base + 4.05, 1.75), 16);
+  // garagem (nível 2+) e segundo andar com varanda (nível 3)
+  let bloco = null, fr2 = null;
+  if (nv >= 2) {
+    bloco = new THREE.Group(); casa.add(bloco);
+    const doisAndares = nv >= 3, H = doisAndares ? 7.0 : 4.4, W = doisAndares ? 9.6 : 6.4;
+    bloco.position.set(doisAndares ? 2.2 * s : 2.6 * s, 0, doisAndares ? -0.6 : -0.4);
+    bloco.add(caixa(W, H, doisAndares ? 8.4 : 7.4, reboco, 0, base + H / 2, 0));
+    const dz = doisAndares ? 4.2 : 3.7;
+    const gx = doisAndares ? 2.3 * s : 0.6 * s;
+    const gar = new THREE.Group(); gar.position.set(gx, 0, dz + 0.01); bloco.add(gar);
+    gar.add(caixa(4.6, 2.9, 0.12, MR.garagem, 0, base + 1.45, 0));
+    for (let i = 1; i < 5; i++) gar.add(caixa(4.6, 0.03, 0.14, MR.preto, 0, base + i * 0.58, 0.02));
+    gar.add(caixa(5.1, 0.25, 0.3, MR.branco, 0, base + 3.05, 0.1));
+    for (const x of [-2.55, 2.55]) gar.add(caixa(0.4, 3.2, 0.4, MR.branco, x, base + 1.6, 0.1));
+    const lant = lanternaR(); lant.position.set(-2.95, base + 2.3, 0.1); gar.add(lant);
+    const lant2 = lanternaR(); lant2.position.set(2.95, base + 2.3, 0.1); gar.add(lant2);
+    if (leds) ledsLinha(gar, V3(-2.5, base + 3.22, 0.3), V3(2.5, base + 3.22, 0.3), 26);
+    const tx = telhadoXR({ w: W, d: doisAndares ? 8.4 : 7.4, h: doisAndares ? 2.2 : 1.8, parede, telha }); tx.position.y = base + H; bloco.add(tx);
+    if (doisAndares) {
+      bloco.add(caixa(W + 0.2, 0.2, 8.6, MR.branco, 0, 3.9, 0));
+      fr2 = frontaoR({ w: 5.2, d: 3, h: 2.4, parede, telha }); fr2.position.set(gx, base + H, 3.0); bloco.add(fr2);
+      if (leds) ledsFrontao(bloco, fr2);
+      // varanda com grade de ferro sobre a garagem
+      const va = new THREE.Group(); va.position.set(gx, 4.0, dz); bloco.add(va);
+      va.add(caixa(5.4, 0.2, 1.4, MR.branco, 0, 0, 0.5));
+      va.add(caixa(5.5, 0.12, 1.5, snowMat, 0, 0.14, 0.5));
+      const barras = new THREE.InstancedMesh(new THREE.BoxGeometry(0.03, 0.9, 0.03), MR.preto, 40), m4 = new THREE.Matrix4();
+      for (let i = 0; i < 40; i++) { m4.makeTranslation(-2.6 + i * 0.133, 0.55, 1.15); barras.setMatrixAt(i, m4); }
+      va.add(barras);
+      va.add(caixa(5.4, 0.06, 0.06, MR.preto, 0, 1.0, 1.15));
+      const pf = janelaR(2.4, 2.1, 4, 3); pf.position.set(0, 1.15, 0.02); va.add(pf);
+      if (leds && it.pisca >= 2) ledsLinha(va, V3(-2.7, 1.06, 1.2), V3(2.7, 1.06, 1.2), 30, bulbMat);
+      for (const x of [-2.8 * s, -0.8 * s]) { const j = janelaR(1.1, 1.6, 2, 2); j.position.set(x, 5.6, dz + 0.02); bloco.add(j); janelas.push([bloco, x, 4.8, dz + 0.02]); }
+    }
+  }
+  if (leds && it.pisca >= 2) { // contorno das janelas da ala em colorido
+    for (const [alvo, x, y, z] of janelas) { ledsLinha(alvo, V3(x - 0.7, y + 2.75, z + 0.18), V3(x + 0.7, y + 2.75, z + 0.18), 8, bulbMat); }
+  }
+  if (it.velas) for (const [alvo, x, y, z] of janelas) { const c = candle(); c.scale.setScalar(1.6); c.position.set(x, y - 0.05, z + 0.32); alvo.add(c); }
+  // chaminé
+  const chX = alaX - 1.6 * s * (nv === 1 ? -1 : 1);
+  casa.add(caixa(0.8, 2.6, 0.8, MR.branco, chX, base + 6.9, -2.2));
+  casa.add(caixa(1.0, 0.25, 1.0, MR.preto, chX, base + 8.3, -2.2));
+  // base, caminho e jardim (lote vai até z = +9.5 nas unidades da casa)
+  casa.add(caixa(nv === 1 ? 7.0 : 14.6, 0.35, 9.2, MR.calcada, nv === 1 ? 0 : 0.6 * s * (nv === 2 ? -1.2 : 1), 0.17, 0));
+  const xPorta = ent.position.x;
+  casa.add(caixa(2.0, 0.08, 5.0, MR.pedra, xPorta, 0.04, 7.2));
+  if (nv >= 2) { const pc = caixa(5.2, 0.06, 5.2, MR.pedra, bloco.position.x + (nv >= 3 ? 2.3 * s : 0.6 * s), 0.03, 7.0); casa.add(pc); }
+  const lant3 = lanternaR(); lant3.position.set(xPorta - 1.0, base + 2.6, ent.position.z + 0.06); casa.add(lant3);
+  const lant4 = lanternaR(); lant4.position.set(xPorta + 1.0, base + 2.6, ent.position.z + 0.06); casa.add(lant4);
+  // arbustos sempre (bordinha baixa); o jardim de inverno acrescenta topiarias, ciprestes, postes e o carro
+  const xs = []; for (let x = -7; x <= 7; x += 1.2) if (Math.abs(x - xPorta) > 1.4 && (nv < 2 || Math.abs(x - (bloco.position.x + (nv >= 3 ? 2.3 * s : 0.6 * s))) > 2.8)) xs.push(x);
+  for (const x of xs) { if (nv === 1 && Math.abs(x) > 3.6) continue; const b = arbustoR(R(0.45, 0.6)); b.position.set(x, 0.5, 5.4); casa.add(b); const n = arbustoR(0.35, snowMat); n.scale.y = 0.35; n.position.set(x, 0.95, 5.4); casa.add(n); }
+  if (it.jardim) {
+    for (const dx of [-1.6, 1.6]) { const c = conePinheiro(0.6, 2.8); c.position.set(xPorta + dx, 0, 6.2); casa.add(c); const n = conePinheiro(0.22, 0.6, snowMat); n.position.set(xPorta + dx, 2.3, 6.2); casa.add(n); }
+    for (const dx of [-1.3, 1.3]) { const pj = posteJardim(); pj.position.set(xPorta + dx, 0, 8.6); casa.add(pj); }
+    if (it.jardim >= 2) {
+      const ci = new THREE.Group(); ci.position.set(-6.6 * s, 0, 3); casa.add(ci);
+      ci.add(mR(new THREE.CylinderGeometry(0.12, 0.15, 0.8, 8), mat(0x4a3322), 0, 0.4, 0));
+      const cc = conePinheiro(1.2, 8); cc.position.y = 4.4; ci.add(cc);
+      if (nv >= 2) { const car = carroEsportivo([0xc0182c, 0x1d3a6e, 0x202226, 0xe8e8ea][hv % 4]); car.position.set(bloco.position.x + (nv >= 3 ? 2.3 * s : 0.6 * s), 0.05, 7.4); car.rotation.y = Math.PI / 2 + (s > 0 ? 0 : Math.PI); casa.add(car); }
+    }
+  }
+  casa.scale.setScalar(0.5); casa.position.z = -1.0;
+  const g = new THREE.Group(); g.add(casa);
+  fundir(casa);
+  addPool(g, xPorta * 0.5, 2.6, 5);
+  g.userData.smoke = [V3(chX * 0.5, (base + 8.6) * 0.5, -2.2 * 0.5 - 1.0)];
+  g.userData.altura = nv >= 3 ? 6.4 : 5;
+  return g;
+}
+
+// Junta as malhas estáticas de um grupo por material (menos chamadas de desenho no celular).
+// Instâncias (LEDs, grades) ficam como estão.
+function fundir(grupo) {
+  grupo.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(grupo.matrixWorld).invert(), porMat = new Map(), remover = [];
+  grupo.traverse(o => {
+    if (!o.isMesh || o.isInstancedMesh) return;
+    const geo = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone());
+    for (const k of Object.keys(geo.attributes)) if (!['position', 'normal', 'uv'].includes(k)) geo.deleteAttribute(k);
+    if (!geo.attributes.uv) geo.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(geo.attributes.position.count * 2), 2));
+    geo.clearGroups();
+    geo.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+    if (!porMat.has(o.material)) porMat.set(o.material, []);
+    porMat.get(o.material).push(geo);
+    remover.push(o);
+  });
+  for (const o of remover) { o.parent.remove(o); o.geometry.dispose(); }
+  const vazios = []; grupo.traverse(o => { if (o !== grupo && o.isGroup && !o.children.length) vazios.push(o); });
+  for (const o of vazios) o.parent && o.parent.remove(o);
+  for (const [m, geos] of porMat) {
+    const junto = mergeGeometries(geos, false); geos.forEach(g => g.dispose());
+    if (!junto) continue;
+    const mm = new THREE.Mesh(junto, m); mm.castShadow = true; mm.receiveShadow = true;
+    if (m === MR.lampada || m === MR.vidro) mm.castShadow = false;
+    grupo.add(mm);
+  }
+}
+
 
 function makeFactory() {
   const g = new THREE.Group(), w = 11, d = 8, H = 6, base = 0.4;
@@ -506,7 +704,7 @@ function makeElf(color = 0x2e9e5b) {
   const brim = mesh(new THREE.TorusGeometry(0.29, 0.07, 8, 20), white, 0, 0.02, 0); brim.rotation.x = Math.PI / 2; hat.add(brim);
   hat.add(mesh(new THREE.SphereGeometry(0.1, 10, 8), white, 0, 0.8, 0));
   g.userData = { arms, legs, hat };
-  g.scale.setScalar(1.15);
+  g.scale.setScalar(0.85);
   return shadowAll(g);
 }
 // Duende construtor: capacete amarelo e martelo.
@@ -1008,7 +1206,7 @@ export async function criarCena(canvas) {
   // moradores (passeiam; quando tem enfeite pra pôr na árvore, vão lá pendurar)
   const escada = makeEscada(); escada.visible = false; scene.add(escada);
   const moradores = [[0xb8242c, 0xf2f2f2], [0x2f5d9e, 0xffc94d], [0x3a7a4a, 0xd8333a], [0x8a5cc8, 0xf2f2f2]].map(([c, g], i) => {
-    const o = makePessoa(c, g); o.position.set(R(-15, 15), 0, RUA_Z + R(-1.5, 1.5)); scene.add(o);
+    const o = makePessoa(c, g); o.scale.setScalar(0.85); o.position.set(R(-15, 15), 0, RUA_Z + R(-1.5, 1.5)); scene.add(o);
     return { obj: o, alvo: o.position.clone(), troca: 0, idx: i };
   });
 
