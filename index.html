@@ -157,7 +157,42 @@
   <!-- amigos (próxima etapa) -->
   <section class="sheet glass" id="sheet-amigos" hidden aria-label="Amigos">
     <div class="sheet-head"><h2>Amigos</h2><button type="button" class="round" data-fechar aria-label="Fechar"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
-    <p class="info">Em breve: lista de amigos, visitar a vila deles, mandar presentes e ajudar a acelerar a produção.</p>
+    <div id="am-offline" class="aviso" hidden>Amigos precisam de internet. Conecte e abra de novo.</div>
+    <div id="am-conteudo">
+      <div class="melhoria">
+        <div class="item-info"><b>Seu nome</b><input id="am-nome" class="campo" maxlength="24" placeholder="Como os amigos te veem" autocomplete="nickname"></div>
+        <button type="button" class="buy caro" id="am-salvar">Salvar</button>
+      </div>
+      <div class="melhoria">
+        <div class="item-info"><b>Seu código de amigo</b><span class="codigo" id="am-meu-codigo">······</span></div>
+        <button type="button" class="buy" id="am-convidar">Convidar</button>
+      </div>
+      <div class="melhoria">
+        <div class="item-info"><b>Adicionar amigo</b><input id="am-codigo" class="campo" maxlength="8" placeholder="Código do amigo" autocapitalize="characters" autocomplete="off"></div>
+        <button type="button" class="buy" id="am-add">Adicionar</button>
+      </div>
+      <div id="am-presentes"></div>
+      <div class="secao">Seus amigos</div>
+      <div class="itens" id="am-lista"></div>
+      <details class="outro-aparelho">
+        <summary>Jogar em outro aparelho</summary>
+        <p class="info">Gere um código aqui e digite no outro aparelho pra abrir esta mesma vila. Guarde em lugar seguro: quem tiver o código entra na sua vila.</p>
+        <button type="button" class="act" id="am-gerar">Gerar código de recuperação</button>
+        <p class="codigo grande" id="am-recuperacao" hidden></p>
+        <div class="melhoria"><div class="item-info"><b>Tenho um código</b><input id="am-rec-codigo" class="campo" maxlength="14" placeholder="XXXX-XXXX-XXXX" autocapitalize="characters" autocomplete="off"></div><button type="button" class="buy caro" id="am-entrar">Entrar</button></div>
+      </details>
+    </div>
+  </section>
+
+  <!-- visitando um amigo -->
+  <header class="friend glass" id="visita-topo" hidden>
+    <div class="avatar" id="vs-avatar">A</div>
+    <div class="grow"><div class="vname" id="vs-nome">Vila do amigo</div><div class="sub" id="vs-sub"></div></div>
+    <button type="button" class="act" id="vs-voltar">Voltar</button>
+  </header>
+  <section class="visit" id="visita-acoes" hidden aria-label="Visitando um amigo">
+    <p class="dica glass" id="vs-dica">Toque num prédio pra ajudar o seu amigo</p>
+    <button type="button" class="cta gold" id="vs-presente">Mandar presente</button>
   </section>
 </div>
 

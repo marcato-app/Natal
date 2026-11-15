@@ -84,6 +84,22 @@ recalcula pelo tempo que passou, então o "produz com o jogo fechado" sai de gra
 Sem servidor (abrindo o arquivo direto, ou fora do ar) o jogo roda com a cópia
 salva no `localStorage` e manda a fila quando o servidor voltar.
 
+### Amigos
+
+- Cada jogador tem **nome** e **código de amigo** público (6 letras, `jogadores.codigo`).
+  Adicionar por código (`POST /api/amigos`) cria a amizade nos dois sentidos. O convite
+  é o link `/?amigo=CODIGO` (WhatsApp/compartilhar): quem abre já vira amigo.
+- **Visitar** (`GET /api/amigos/:id/vila`): a cena mostra a vila do amigo (só olhar).
+- **Presente** (`POST /api/amigos/:id/presente`): 1 por dia por amigo; fica pendente em
+  `presentes` até o dono abrir (`POST /api/presentes/resgatar`, `PRESENTE_AMIGO` cada).
+- **Ajuda** (`POST /api/amigos/:id/ajuda`): 1 por dia por amigo; adianta obra ou
+  produção do prédio tocado (`receberAjuda`) e dá `RECOMPENSA_AJUDANTE` pra quem ajudou.
+  Essas mudanças são feitas pelo servidor direto nas duas vilas (`mudarVila`); não
+  existem como ação da fila (o dono não consegue se ajudar).
+- **Outro aparelho**: `POST /api/eu/recuperacao` gera um código XXXX-XXXX-XXXX (hash em
+  `recuperacao_hash`); `POST /api/recuperar` troca por um token novo guardado em
+  `sessoes` (os aparelhos antigos continuam funcionando).
+
 ### API
 
 - `POST /api/jogador` — cria jogador anônimo com a vila inicial; devolve o token
@@ -138,9 +154,10 @@ npm run dev   # (ou node scripts/dev.mjs) http://localhost:8787 — mesmo Worker
 ## Banco de dados
 
 Não há deploy automático de schema. Rodar no D1 Console, em ordem:
-`001_estrutura.sql`. Mudança nova de banco vira um arquivo numerado em `migrations/`.
+`001_estrutura.sql`, `002_amigos.sql`. Mudança nova de banco vira um arquivo numerado em `migrations/`.
 
-O `natal-db` foi criado e a `001_estrutura.sql` já rodou nele em 2026-11-14.
+O `natal-db` foi criado e a `001_estrutura.sql` já rodou nele em 2026-11-14; a
+`002_amigos.sql` em 2026-11-15.
 
 ## No ar
 
@@ -160,7 +177,9 @@ node test/api.test.mjs      # API + roteamento
 
 ## Próximas etapas
 
-1. Contas (nome + login) ligadas ao jogador anônimo, pra abrir a mesma vila em outro aparelho.
-2. Amigos: lista, visitar a vila do amigo (só leitura), mandar presente, ajudar a
-   acelerar a produção dele. Durable Objects só se precisar de tempo real.
-3. Trocar modelos gerados por código por modelos 3D prontos (.glb), um por vez, em `MODELOS`.
+1. Publicar nas lojas: contas de desenvolvedor, IDs reais do AdMob, compras de estrelas
+   (produtos nas lojas + validação do recibo no servidor), política de privacidade,
+   decidir público infantil.
+2. Ranking entre amigos, cartão-postal da vila pra compartilhar, notificações.
+3. Medir retenção (D1/D7) e limitar criação de contas por IP.
+4. Trocar modelos gerados por código por modelos 3D prontos (.glb), um por vez, em `MODELOS`.

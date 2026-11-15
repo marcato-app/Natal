@@ -185,8 +185,9 @@ function desenharHud() {
   $('presente-ponto').hidden = !presenteDeHoje(estado, agora());
 }
 
+function sincCena() { cena.sincronizar(visitando ? visitando.vila : estado); }
 function desenhar() {
-  cena.sincronizar(estado);
+  sincCena();
   desenharHud();
   if (painel === 'predio') desenharPredio();
   if (painel === 'duendes') desenharDuendes();
@@ -198,7 +199,7 @@ function desenhar() {
 /* ---------- painéis ---------- */
 
 function abrir(qual) {
-  if (colocando || dentro) return;
+  if (colocando || dentro || (visitando && qual)) return;
   painel = qual;
   for (const p of ['construir', 'predio', 'duendes', 'amigos', 'missoes', 'presente', 'ajustes', 'boasvindas', 'loja']) $('sheet-' + p).hidden = p !== qual;
   $('nav').hidden = !!qual;
@@ -208,6 +209,7 @@ function abrir(qual) {
   if (qual === 'missoes') desenharMissoes();
   if (qual === 'presente') desenharPresente();
   if (qual === 'loja') desenharLoja();
+  if (qual === 'amigos') abrirAmigos();
   if (qual === 'ajustes') { const pf = som.preferencias(); $('aj-musica').checked = pf.musica; $('aj-sons').checked = pf.sons; $('aj-qualidade').value = String(cena.qualidade()); }
   if (qual === 'predio') { vendaPendente = false; desenharPredio.chave = null; desenharPredio(); }
   deslocarCena();
@@ -449,6 +451,113 @@ $('aj-sons').addEventListener('change', (e) => som.setSons(e.target.checked));
 $('aj-qualidade').addEventListener('change', (e) => cena.setQualidade(Number(e.target.value)));
 $('bv-ok').addEventListener('click', () => { try { localStorage.setItem('natal.boasvindas', '1'); } catch { /* ok */ } som.iniciar(); fechar(); });
 
+// Amigos
+let eu = null, amigos = [], visitando = null;
+const SITE = 'https://natal.flat-salad-71d3.workers.dev';
+async function abrirAmigos() {
+  const sem = !ls.get(LS_TOKEN);
+  try {
+    eu = await api('GET', '/api/eu');
+    $('am-offline').hidden = true; $('am-conteudo').hidden = false;
+  } catch { $('am-offline').hidden = false; $('am-conteudo').hidden = true; return; }
+  if (sem) return;
+  $('am-nome').value = eu.nome || '';
+  $('am-meu-codigo').textContent = eu.codigo;
+  await carregarAmigos();
+}
+async function carregarAmigos() {
+  try { amigos = (await api('GET', '/api/amigos')).amigos; } catch { amigos = []; }
+  const pend = eu?.presentesPendentes || 0;
+  $('am-presentes').innerHTML = pend ? `<div class="melhoria"><div class="item-info"><b>${pend} presente${pend > 1 ? 's' : ''} de amigos!</b><small>Moedas e doces esperando por você</small></div><button type="button" class="buy" id="am-abrir-presentes">Abrir</button></div>` : '';
+  $('am-lista').innerHTML = amigos.length ? amigos.map(a => `<div class="item-row"><div class="item-info"><b>${esc(a.nome)}</b><small>Nível ${a.nivel} · ${a.codigo}</small></div>
+    <div class="amigo-acoes"><button type="button" class="buy caro" data-presente="${a.id}" ${a.podePresentear ? '' : 'disabled'}>${a.podePresentear ? 'Presente' : 'Enviado'}</button><button type="button" class="buy" data-visitar="${a.id}">Visitar</button></div></div>`).join('')
+    : '<p class="info">Ainda sem amigos. Mande seu código ou o convite no WhatsApp: cada um que entrar vira seu vizinho.</p>';
+}
+const esc = (t) => String(t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+$('am-salvar').addEventListener('click', async () => {
+  try { const r = await api('PUT', '/api/eu', { nome: $('am-nome').value }); toast(`Pronto, ${r.nome}!`); } catch (e) { toast(e.status === 400 ? 'O nome precisa ter pelo menos 2 letras' : 'Sem conexão'); }
+});
+$('am-convidar').addEventListener('click', async () => {
+  if (!eu) return;
+  const link = `${SITE}/?amigo=${eu.codigo}`, texto = `Vem montar sua Vila de Natal comigo! 🎄 Meu código de amigo: ${eu.codigo}\n${link}`;
+  try { if (navigator.share) { await navigator.share({ title: 'Vila de Natal', text: texto }); return; } } catch { return; }
+  const w = window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank');
+  if (!w) { try { await navigator.clipboard.writeText(texto); toast('Convite copiado! Cole no WhatsApp.'); } catch { toast(`Seu código: ${eu.codigo}`); } }
+});
+async function adicionarAmigo(codigo) {
+  try { const r = await api('POST', '/api/amigos', { codigo }); toast(`Agora você e ${r.nome} são vizinhos!`); som.tocar('presente'); return true; }
+  catch (e) { toast(e.status === 404 ? 'Não achei ninguém com esse código' : e.status === 400 ? 'Esse é o seu próprio código' : 'Sem conexão'); return false; }
+}
+$('am-add').addEventListener('click', async () => { if (await adicionarAmigo($('am-codigo').value)) { $('am-codigo').value = ''; carregarAmigos(); } });
+$('am-presentes').addEventListener('click', async (e) => {
+  if (!e.target.closest('#am-abrir-presentes')) return;
+  try {
+    const r = await api('POST', '/api/presentes/resgatar');
+    receber(r); desenhar(); som.tocar('presente');
+    toast(`${r.quantos} presente${r.quantos > 1 ? 's' : ''}: ${Object.entries(r.ganho).map(([k, q]) => `+${fmt(q)} ${k}`).join(' ')}`);
+    eu.presentesPendentes = 0; carregarAmigos();
+  } catch { toast('Não deu pra abrir agora'); }
+});
+$('am-lista').addEventListener('click', async (e) => {
+  const pr = e.target.closest('[data-presente]');
+  if (pr) { await mandarPresente(pr.dataset.presente); carregarAmigos(); return; }
+  const vs = e.target.closest('[data-visitar]'); if (vs) visitar(vs.dataset.visitar);
+});
+async function mandarPresente(id) {
+  try { await api('POST', `/api/amigos/${id}/presente`); som.tocar('presente'); toast('Presente enviado!'); const a = amigos.find(x => x.id === id); if (a) a.podePresentear = false; return true; }
+  catch (e) { toast(e.status === 409 ? 'Você já mandou presente pra esse amigo hoje' : 'Sem conexão'); return false; }
+}
+$('am-gerar').addEventListener('click', async () => {
+  try { const r = await api('POST', '/api/eu/recuperacao'); $('am-recuperacao').textContent = r.codigo; $('am-recuperacao').hidden = false; toast('Anote o código. Ele só aparece agora.'); }
+  catch { toast('Sem conexão'); }
+});
+$('am-entrar').addEventListener('click', async () => {
+  try {
+    const r = await (await fetch(API + '/api/recuperar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ codigo: $('am-rec-codigo').value }) })).json();
+    if (!r.token) { toast(r.error || 'Código não encontrado'); return; }
+    ls.set(LS_TOKEN, r.token); fila = []; receber(r); fechar(); desenhar(); toast('Vila carregada!');
+  } catch { toast('Sem conexão'); }
+});
+
+// Visitar a vila de um amigo (só olhar e ajudar)
+async function visitar(id) {
+  let r;
+  try { r = await api('GET', `/api/amigos/${id}/vila`); } catch { toast('Não deu pra visitar agora'); return; }
+  const a = amigos.find(x => x.id === id) || { nome: r.nome, nivel: nivelDe(r.vila.alegria), podeAjudar: true, podePresentear: true };
+  fechar();
+  visitando = { id, nome: r.nome, vila: r.vila, amigo: a };
+  document.body.classList.add('visitando');
+  $('nav').hidden = true; $('visita-topo').hidden = false; $('visita-acoes').hidden = false;
+  $('vs-avatar').textContent = (r.nome || 'V')[0].toUpperCase();
+  $('vs-nome').textContent = `Vila de ${r.nome}`;
+  desenharVisita();
+  sincBaloes(); sincCena();
+}
+function desenharVisita() {
+  const a = visitando.amigo;
+  $('vs-sub').textContent = `Nível ${nivelDe(visitando.vila.alegria)} · ${visitando.vila.predios.length} prédios`;
+  $('vs-dica').textContent = a.podeAjudar ? 'Toque num prédio pra ajudar: adianta a produção ou a obra (você ganha moedas)' : 'Você já ajudou hoje. Volte amanhã!';
+  $('vs-presente').disabled = !a.podePresentear;
+  $('vs-presente').textContent = a.podePresentear ? 'Mandar presente' : 'Presente enviado hoje';
+}
+async function ajudarAmigo(pid) {
+  const a = visitando.amigo;
+  if (!a.podeAjudar) { toast('Você já ajudou esse amigo hoje'); return; }
+  try {
+    const r = await api('POST', `/api/amigos/${visitando.id}/ajuda`, { predio: pid });
+    a.podeAjudar = false; visitando.vila = r.vilaAmigo;
+    receber(r); sincCena(); desenharHud(); desenharVisita(); som.tocar('moeda'); vibrar();
+    toast(`${r.como === 'obra' ? 'Obra adiantada' : 'Produção adiantada'}! Você ganhou +${r.recompensa.moedas} moedas`);
+  } catch (e) { toast(e.status === 409 ? 'Você já ajudou esse amigo hoje' : e.status === 400 ? 'Esse prédio não precisa de ajuda' : 'Sem conexão'); }
+}
+$('vs-presente').addEventListener('click', async () => { if (await mandarPresente(visitando.id)) { visitando.amigo.podePresentear = false; desenharVisita(); } });
+$('vs-voltar').addEventListener('click', () => {
+  visitando = null;
+  document.body.classList.remove('visitando');
+  $('visita-topo').hidden = true; $('visita-acoes').hidden = true; $('nav').hidden = false;
+  desenhar();
+});
+
 // Itens (enfeites da árvore, fachada, móveis)
 function linhasItens(p, grupo) {
   return Object.entries(ITENS[p.tipo]).filter(([, d]) => d.grupo === grupo).map(([k, d]) => {
@@ -599,6 +708,7 @@ function coletar(id, ponto = null) {
 const baloes = new Map();
 function sincBaloes() {
   const vivos = new Set();
+  if (visitando) { for (const el of baloes.values()) el.remove(); baloes.clear(); return; }
   for (const p of estado.predios) {
     const pr = TIPOS[p.tipo].prod, aluguel = aluguelDe(p);
     let html = null, cls = 'balao', rotulo = '';
@@ -728,6 +838,7 @@ function ligarToques(canvas) {
     if (!tap) return;
     if (colocando) { moverFantasmaPara(e.clientX, e.clientY); return; }
     if (dentro) { const k = cena.itemEm(e.clientX, e.clientY); if (k) focarLinha(k); return; }
+    if (visitando) { const pid = cena.predioEm(e.clientX, e.clientY); if (pid) ajudarAmigo(pid); return; }
     const id = cena.predioEm(e.clientX, e.clientY);
     if (id) {
       const p = predio(estado, id), pr = p && TIPOS[p.tipo].prod;
@@ -766,6 +877,8 @@ async function iniciar() {
   let viu = null; try { viu = localStorage.getItem('natal.boasvindas'); } catch { /* ok */ }
   if (!viu) abrir('boasvindas');
   if (!online) toast('Jogando sem conexão: o progresso fica salvo neste aparelho.');
+  const convite = new URLSearchParams(location.search).get('amigo');
+  if (convite && online) { adicionarAmigo(convite); history.replaceState(null, '', location.pathname); }
   if (fila.length) agendarEnvio(500);
 
   // o tempo passa: produção anda e os balões aparecem
@@ -774,7 +887,7 @@ async function iniciar() {
     avancar(estado, agora());
     const prontas = obras.filter(([p]) => !p.obra);
     for (const [p, tipo] of prontas) toast(tipo === 'construir' ? `${TIPOS[p.tipo].nome} pronta!${TIPOS[p.tipo].prod ? ' Coloque duendes nela.' : ''}` : tipo === 'melhorar' ? `Casa aumentada pro nível ${p.nv}!` : 'Os moradores terminaram de enfeitar a árvore!');
-    if (prontas.length) { cena.sincronizar(estado); som.tocar('pronto'); }
+    if (prontas.length) { sincCena(); som.tocar('pronto'); }
     if (nivelDe(estado.alegria) > nivelAntes) subiuNivel(nivelDe(estado.alegria));
     desenharHud();
     sincBaloes();
@@ -788,7 +901,7 @@ async function iniciar() {
   // Papai Noel: passa pelas casas enfeitadas com aluguel pronto (e de vez em quando só passeia)
   let semVisita = 0;
   const chamarNoel = () => {
-    if (cena.noelVoando() || colocando) return;
+    if (cena.noelVoando() || colocando || visitando) return;
     const alvos = estado.predios.filter(p => aluguelDe(p) && prontos(p) >= 1).map(p => ({ id: p.id, pos: cena.chamineDe(p.id) })).filter(a => a.pos);
     if (!alvos.length && ++semVisita % 5) return;
     semVisita = 0;

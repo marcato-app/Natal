@@ -150,6 +150,22 @@ button.pill { border: 1px solid var(--line); color: var(--snow); cursor: pointer
 .video-teste b { font: 700 24px/1.2 var(--display); color: var(--snow); }
 .cta.video { background: rgba(255,255,255,.1); color: var(--snow); box-shadow: none; border: 1px solid var(--line); }
 
+/* amigos */
+.campo { width: 100%; min-height: 40px; margin-top: 4px; border-radius: 10px; border: 1px solid var(--line); background: rgba(0,0,0,.25); color: var(--snow); font: 700 16px/1 var(--body); padding: 0 10px; -webkit-user-select: text; user-select: text; }
+.codigo { font: 700 22px/1.2 var(--display); letter-spacing: 3px; color: var(--gold); -webkit-user-select: text; user-select: text; }
+.codigo.grande { text-align: center; font-size: 26px; margin: 8px 0; }
+.outro-aparelho { border-radius: 16px; background: rgba(255,255,255,.04); padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.outro-aparelho summary { cursor: pointer; font-weight: 800; color: var(--muted); min-height: 28px; }
+.outro-aparelho[open] { display: flex; }
+.amigo-acoes { display: flex; gap: 6px; flex-shrink: 0; }
+.amigo-acoes .buy { min-width: 64px; }
+.friend { align-self: center; display: flex; align-items: center; gap: 12px; padding: 8px 10px 8px 8px; border-radius: 24px; width: min(100%, 520px); }
+.friend .grow { flex: 1; min-width: 0; }
+.avatar { width: 48px; height: 48px; border-radius: 50%; background: #7aa8ff; color: var(--night); display: grid; place-items: center; font: 700 22px/1 var(--display); flex-shrink: 0; }
+.visit { align-self: center; width: min(100%, 520px); display: flex; flex-direction: column; gap: 10px; }
+.dica { margin: 0; padding: 10px 14px; border-radius: 16px; text-align: center; font-weight: 800; font-size: 14px; }
+body.visitando .hud .lvl, body.visitando .linha-topo { display: none; }
+
 /* itens (enfeites, fachada, móveis) */
 .secao { margin: 4px 0 -4px; font: 600 15px/1.2 var(--display); color: var(--muted); }
 .itens { display: flex; flex-direction: column; gap: 6px; }

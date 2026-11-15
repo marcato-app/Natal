@@ -329,6 +329,33 @@ function concluirObra(v, p) {
   }
 }
 
+/* ------------------------------ amigos ------------------------------ */
+// Estas não passam por aplicar(): o servidor chama quando um AMIGO age (o dono não pode
+// se dar ajuda nem presente pela fila de ações).
+export const PRESENTE_AMIGO = { moedas: 30, doces: 10 };
+export const AJUDA_OBRA = 10 * 60;        // segundos que uma ajuda tira de uma obra
+export const AJUDA_PRODUCAO = 0.5;        // ciclos de produção que uma ajuda adianta
+export const RECOMPENSA_AJUDANTE = { moedas: 15 };
+
+// Ajuda de amigo num prédio: adianta a obra ou a produção.
+export function receberAjuda(v, id, agora) {
+  avancar(v, agora);
+  const p = predio(v, id);
+  if (!p) return { ok: false, erro: 'Prédio não encontrado' };
+  if (p.obra && p.obra.tipo !== 'enfeite' && p.obra.item === undefined) {
+    p.obra = { ...p.obra, fim: p.obra.fim - AJUDA_OBRA * 1000 };
+    if (agora >= p.obra.fim) concluirObra(v, p);
+    return { ok: true, como: 'obra' };
+  }
+  const pr = TIPOS[p.tipo].prod;
+  if (pr || aluguelDe(p)) {
+    p.prog = Math.min(ESTOQUE_MAX, (p.prog || 0) + AJUDA_PRODUCAO);
+    return { ok: true, como: 'producao' };
+  }
+  return { ok: false, erro: 'Esse prédio não precisa de ajuda' };
+}
+export function darRecompensa(v, premio, agora) { avancar(v, agora); receber(v, premio); }
+
 /* ------------------------------ ações ------------------------------ */
 
 function pagar(v, custo) { for (const [r, q] of Object.entries(custo)) v[r] -= q; }

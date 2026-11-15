@@ -95,6 +95,51 @@ check('mais de 50 ações = 400', (await call('POST', '/api/acoes', { token, bod
   check('outro jogador começa do zero', r.data.vila.predios.every(p => p.tipo !== 'padaria'));
 }
 
+// conta e amigos
+{
+  const ana = await call('POST', '/api/jogador'), bia = await call('POST', '/api/jogador');
+  const ta = ana.data.token, tb = bia.data.token;
+  const eu = await call('GET', '/api/eu', { token: ta });
+  check('jogador tem código de amigo de 6 letras', /^[A-Z0-9]{6}$/.test(eu.data.codigo));
+  check('nome curto é recusado', (await call('PUT', '/api/eu', { token: ta, body: { nome: 'A' } })).status === 400);
+  check('salva o nome', (await call('PUT', '/api/eu', { token: ta, body: { nome: 'Ana <script>' } })).data.nome === 'Ana script');
+  await call('PUT', '/api/eu', { token: tb, body: { nome: 'Bia' } });
+  const cb = (await call('GET', '/api/eu', { token: tb })).data.codigo;
+  check('código errado não acha ninguém', (await call('POST', '/api/amigos', { token: ta, body: { codigo: 'ZZZZZZ' } })).status === 404);
+  check('não adiciona a si mesmo', (await call('POST', '/api/amigos', { token: ta, body: { codigo: eu.data.codigo } })).status === 400);
+  const add = await call('POST', '/api/amigos', { token: ta, body: { codigo: cb.toLowerCase() } });
+  check('adiciona amigo pelo código (sem ligar pra maiúscula)', add.status === 201 && add.data.nome === 'Bia');
+  const listaB = await call('GET', '/api/amigos', { token: tb });
+  check('amizade vale nos dois sentidos', listaB.data.amigos.length === 1 && listaB.data.amigos[0].nome.startsWith('Ana'));
+  const idB = add.data.id, idA = listaB.data.amigos[0].id;
+  check('visita a vila do amigo', (await call('GET', `/api/amigos/${idB}/vila`, { token: ta })).data.vila.predios.length > 3);
+  const estranho = await call('POST', '/api/jogador');
+  check('não visita quem não é amigo', (await call('GET', `/api/amigos/${idB}/vila`, { token: estranho.data.token })).status === 404);
+  check('manda presente', (await call('POST', `/api/amigos/${idB}/presente`, { token: ta })).status === 200);
+  check('só um presente por dia pro mesmo amigo', (await call('POST', `/api/amigos/${idB}/presente`, { token: ta })).status === 409);
+  check('amigo vê o presente pendente', (await call('GET', '/api/eu', { token: tb })).data.presentesPendentes === 1);
+  const m0 = (await call('GET', '/api/vila', { token: tb })).data.vila.moedas;
+  const res = await call('POST', '/api/presentes/resgatar', { token: tb });
+  check('resgata presente e ganha moedas', res.data.quantos === 1 && res.data.vila.moedas - m0 === 30);
+  check('não resgata de novo', (await call('POST', '/api/presentes/resgatar', { token: tb })).status === 400);
+  // ajuda: adianta a produção da fábrica do amigo e dá moedas pra quem ajuda
+  const vb = (await call('GET', '/api/vila', { token: tb })).data.vila, fabB = vb.predios.find(p => p.tipo === 'fabrica');
+  const ma = (await call('GET', '/api/vila', { token: ta })).data.vila.moedas;
+  const aj = await call('POST', `/api/amigos/${idB}/ajuda`, { token: ta, body: { predio: fabB.id } });
+  check('ajuda adianta a produção do amigo', aj.status === 200 && aj.data.como === 'producao' && aj.data.vilaAmigo.predios.find(p => p.id === fabB.id).prog >= fabB.prog + 0.5 - 1e-9);
+  check('quem ajuda ganha moedas', aj.data.vila.moedas - ma === 15);
+  check('só uma ajuda por dia pro mesmo amigo', (await call('POST', `/api/amigos/${idB}/ajuda`, { token: ta, body: { predio: fabB.id } })).status === 409);
+  check('dono não se ajuda pela fila de ações', !(await call('POST', '/api/acoes', { token: tb, body: { acoes: [{ tipo: 'ajuda', id: fabB.id }] } })).data.resultados[0].ok);
+  // recuperação
+  const rec = await call('POST', '/api/eu/recuperacao', { token: ta });
+  check('gera código de recuperação XXXX-XXXX-XXXX', /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(rec.data.codigo));
+  const outroAparelho = await call('POST', '/api/recuperar', { body: { codigo: rec.data.codigo.toLowerCase().replace(/-/g, ' ') } });
+  check('abre a mesma vila em outro aparelho', outroAparelho.status === 200 && /^[0-9a-f]{64}$/.test(outroAparelho.data.token));
+  check('token novo funciona', (await call('GET', '/api/eu', { token: outroAparelho.data.token })).data.id === idA);
+  check('o aparelho antigo continua funcionando', (await call('GET', '/api/eu', { token: ta })).data.id === idA);
+  check('código errado não abre nada', (await call('POST', '/api/recuperar', { body: { codigo: 'AAAA-AAAA-AAAA' } })).status === 404);
+}
+
 // CORS só pro app
 {
   const pre = await worker.fetch(new Request('https://natal.test/api/acoes', { method: 'OPTIONS', headers: { Origin: 'capacitor://localhost' } }), env);
