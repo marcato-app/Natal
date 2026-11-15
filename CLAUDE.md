@@ -68,9 +68,10 @@ O `natal-db` foi criado e a `001_estrutura.sql` já rodou nele em 2026-11-14.
 
 ## No ar
 
-Ainda não. O Worker `natal` não foi publicado: o proxy da sessão que criou o
-projeto barra o upload de assets do Wrangler (401). Um `wrangler deploy` normal com
-este `wrangler.toml` publica tudo.
+https://natal.flat-salad-71d3.workers.dev (Worker `natal`). O primeiro deploy
+(2026-11-15) foi feito de uma sessão cujo proxy barrava o upload de assets (401),
+então subiu com os arquivos do jogo embutidos no script, num embrulho fora do repo.
+Um `wrangler deploy` normal com este `wrangler.toml` substitui aquilo sem problema.
 
 ## Testes
 
