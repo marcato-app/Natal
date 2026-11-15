@@ -546,18 +546,51 @@ function makeRink() {
   return g;
 }
 
-function makePine(s = 1) {
-  const g = new THREE.Group();
-  g.add(mesh(new THREE.CylinderGeometry(0.25, 0.35, 1.2, 7), mat(0x5a3a26), 0, 0.6, 0));
-  [[2.2, 3.0, 2.4, 0x1d4a3a], [1.7, 2.6, 3.9, 0x22573f], [1.15, 2.2, 5.2, 0x286347]].forEach(([r, h, y, c], i) => {
-    g.add(mesh(new THREE.ConeGeometry(r, h, 9), mat(c, { roughness: 0.9 }), 0, y, 0));
-    const ch = h * (i === 2 ? 0.6 : 0.45);
-    g.add(mesh(new THREE.ConeGeometry(r * ch / h * 1.07, ch, 9), snowMat, 0, y + h / 2 - ch / 2 + 0.03, 0));
-  });
+// Cone com contorno de galhos (pontas irregulares e borda caída), pra pinheiros realistas.
+function coneGalhos(r, h, segs = 14, seed = 0) {
+  const geo = new THREE.ConeGeometry(r, h, segs * 2, 3), p = geo.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), ang = Math.atan2(z, x), baixo = (h / 2 - y) / h;
+    const ponta = (Math.round((ang + Math.PI) / (Math.PI * 2) * segs * 2) % 2 === 0) ? 1.12 : 0.9;
+    const k = (ponta + Math.sin(ang * 5 + seed) * 0.05) * (0.85 + 0.15 * baixo);
+    p.setXYZ(i, x * k, y - (baixo > 0.95 && ponta > 1 ? h * 0.06 : 0), z * k);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+// Pinheiros de verdade (sem bolas): clássico, abeto (alto e fino) e espruce azul.
+// Aceitam pisca-pisca: nível 1 branco quente, nível 2 colorido.
+const PINHEIROS = {
+  pinheiro: { h: 6.2, r: 2.2, tiers: 5, cores: [0x1d4a3a, 0x22573f, 0x286347] },
+  abeto: { h: 7.6, r: 1.5, tiers: 7, cores: [0x183f30, 0x1d4a39, 0x235442] },
+  espruce: { h: 6.6, r: 2.0, tiers: 6, cores: [0x36615f, 0x3d6d6b, 0x467a79] },
+};
+const ledQuente = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.6, 2.0, 1.15), toneMapped: false });
+function makePinheiroReal(tipo = 'pinheiro', it = {}, s = 1) {
+  const c = PINHEIROS[tipo] || PINHEIROS.pinheiro, g = new THREE.Group();
+  g.add(mesh(new THREE.CylinderGeometry(0.22, 0.32, 1.3, 7), mat(0x5a3a26), 0, 0.65, 0));
+  const topoTronco = 0.9, H = c.h - topoTronco;
+  for (let i = 0; i < c.tiers; i++) {
+    const t = i / c.tiers, r = c.r * (1 - t * 0.85), th = H / c.tiers * 1.75, y = topoTronco + t * (H - th * 0.55) + th / 2;
+    g.add(mesh(coneGalhos(r, th, 9 + (i % 3), i * 1.7), mat(c.cores[i % 3], { roughness: 0.92 }), 0, y, 0));
+    const ch = th * 0.42;
+    g.add(mesh(coneGalhos(r * 0.42 * 1.04, ch, 9, i), snowMat, 0, y + th / 2 - ch / 2 + 0.02, 0));
+  }
+  const n = it.luzes ? (tipo === 'abeto' ? 56 : 48) : 0;
+  if (n) {
+    const colorido = it.luzes >= 2, im = new THREE.InstancedMesh(bulbGeo, colorido ? bulbMat : ledQuente, n), m4 = new THREE.Matrix4(), cor = new THREE.Color();
+    for (let i = 0; i < n; i++) {
+      const t = i / n, y = topoTronco + 0.3 + t * (H - 0.7), env = c.r * (1 - (y - topoTronco) / H) * 0.95 + 0.12, a = t * Math.PI * 2 * 5;
+      m4.makeTranslation(Math.cos(a) * env, y, Math.sin(a) * env); im.setMatrixAt(i, m4);
+      if (colorido) im.setColorAt(i, cor.setRGB(...BULBS[i % 5]));
+    }
+    im.userData.noShadow = true; g.add(im);
+  }
   g.scale.setScalar(s);
-  g.userData.altura = 6.5 * s;
+  g.userData.altura = c.h * s;
   return g;
 }
+function makePine(s = 1) { return makePinheiroReal('pinheiro', {}, s); }
 
 function makeSnowman() {
   const g = new THREE.Group(), coal = mat(0x1d1d24, { roughness: 0.5 });
@@ -616,7 +649,7 @@ function makeTree(it = {}) {
   for (let i = 0; i < 5; i++) {
     const r = 4.3 - i * 0.82, h = 3.3 - i * 0.18, y = 1.1 + i * 1.75 + h / 2;
     tiers.push({ r, h, base: y - h / 2 });
-    g.add(mesh(new THREE.ConeGeometry(r, h, 14), mat([0x1a4d36, 0x1e5a3e, 0x226446, 0x266e4c, 0x2b7853][i], { roughness: 0.9 }), 0, y, 0));
+    g.add(mesh(coneGalhos(r, h, 12, i), mat([0x1a4d36, 0x1e5a3e, 0x226446, 0x266e4c, 0x2b7853][i], { roughness: 0.9 }), 0, y, 0));
     const ch = h * 0.32; g.add(mesh(new THREE.ConeGeometry(r * 0.32 * 1.05, ch, 14), snowMat, 0, y + h / 2 - ch / 2 + 0.02, 0));
   }
   const radiusAt = y => { let best = 0; for (const t of tiers) if (y >= t.base && y <= t.base + t.h) best = Math.max(best, t.r * (1 - (y - t.base) / t.h)); return best; };
@@ -672,7 +705,7 @@ function makePlaza(p = {}) {
 
 export const MODELOS = {
   praca: makePlaza, casa: makeHouse, fabrica: makeFactory, padaria: makeBakery, rinque: makeRink,
-  pinheiro: () => makePine(0.62), boneco: makeSnowman, poste: makeLamp, presentes: makeGiftPile,
+  pinheiro: (p) => makePinheiroReal('pinheiro', p?.itens || {}, 0.6), abeto: (p) => makePinheiroReal('abeto', p?.itens || {}, 0.6), espruce: (p) => makePinheiroReal('espruce', p?.itens || {}, 0.6), boneco: makeSnowman, poste: makeLamp, presentes: makeGiftPile,
 };
 // p = o prédio (nível e itens mudam o modelo). Sem p, sai a versão "de vitrine" pro menu.
 function criarModelo(tipo, p) {
@@ -1167,9 +1200,9 @@ export async function criarCena(canvas) {
     }
     const parts = [
       [new THREE.CylinderGeometry(0.25, 0.35, 1.2, 6), mat(0x5a3a26), 0.6, false],
-      [new THREE.ConeGeometry(2.2, 3.0, 8), mat(0xffffff, { roughness: 0.9 }), 2.4, true],
-      [new THREE.ConeGeometry(1.7, 2.6, 8), mat(0xffffff, { roughness: 0.9 }), 3.9, true],
-      [new THREE.ConeGeometry(1.15, 2.2, 8), mat(0xffffff, { roughness: 0.9 }), 5.2, true],
+      [coneGalhos(2.2, 3.0, 8, 1), mat(0xffffff, { roughness: 0.9 }), 2.4, true],
+      [coneGalhos(1.7, 2.6, 8, 2), mat(0xffffff, { roughness: 0.9 }), 3.9, true],
+      [coneGalhos(1.15, 2.2, 7, 3), mat(0xffffff, { roughness: 0.9 }), 5.2, true],
       [new THREE.ConeGeometry(2.2 * 0.45 * 1.07, 1.35, 8), snowMat, 3.225, false],
       [new THREE.ConeGeometry(1.7 * 0.45 * 1.07, 1.17, 8), snowMat, 4.615, false],
       [new THREE.ConeGeometry(1.15 * 0.6 * 1.07, 1.32, 8), snowMat, 5.64, false],

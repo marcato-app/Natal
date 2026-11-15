@@ -349,6 +349,7 @@ function desenharPredio() {
     corpo += `<div class="itens">${linhasItens(p, 'arvore')}</div>`;
   } else {
     $('pd-sub').textContent = `Decoração · deu +${alegriaAoConstruir(p.tipo)} alegria`;
+    if (ITENS[p.tipo]) corpo += `<div class="itens">${linhasItens(p, 'pisca')}</div>`;
   }
   $('pd-corpo').innerHTML = corpo;
 

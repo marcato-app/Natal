@@ -280,6 +280,17 @@ const fab = (v) => v.predios.find(p => p.tipo === 'fabrica');
   check('prédio que passa da borda do terreno comprado não cabe', !aplicar(v, { tipo: 'construir', predio: 'casa', x: -2, z: 4 }, T0).ok);
 }
 
+// pinheiros com pisca-pisca
+{
+  const v = novaVila(T0); v.moedas = 999;
+  const pin = v.predios.find(p => p.tipo === 'pinheiro');
+  check('pinheiro aceita pisca-pisca (na hora)', aplicar(v, { tipo: 'item', id: pin.id, item: 'luzes' }, T0).ok && pin.itens.luzes === 1);
+  check('pisca colorido no nível 2', aplicar(v, { tipo: 'item', id: pin.id, item: 'luzes' }, T0).ok && pin.itens.luzes === 2);
+  v.alegria = 80;
+  const r = aplicar(v, { tipo: 'construir', predio: 'espruce', x: 0, z: 0 }, T0);
+  check('espruce azul libera no nível 3 e já nasce aceitando pisca', r.ok && v.predios.find(p => p.id === r.id).itens !== undefined);
+}
+
 check('ação desconhecida falha', !aplicar(novaVila(T0), { tipo: 'hackear' }, T0).ok);
 check('ação vazia falha', !aplicar(novaVila(T0), null, T0).ok);
 

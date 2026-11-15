@@ -127,6 +127,8 @@ export const TIPOS = {
   fabrica: { nome: 'Fábrica de Brinquedos', cat: 'producao', tam: 4, custo: { moedas: 400 }, nivel: 2, tempo: 300, prod: { recurso: 'moedas', qtd: 40, ciclo: 60, vagas: 3 } },
   rinque: { nome: 'Rinque de Patinação', cat: 'diversao', tam: 4, custo: { moedas: 600, doces: 50 }, nivel: 3, tempo: 600, prod: { recurso: 'alegria', qtd: 12, ciclo: 120, vagas: 2 } },
   pinheiro: { nome: 'Pinheiro', cat: 'decoracao', tam: 1, custo: { moedas: 15 }, nivel: 1, alegria: 2 },
+  abeto: { nome: 'Abeto', cat: 'decoracao', tam: 1, custo: { moedas: 25 }, nivel: 2, alegria: 3 },
+  espruce: { nome: 'Espruce Azul', cat: 'decoracao', tam: 1, custo: { moedas: 35 }, nivel: 3, alegria: 4 },
   boneco: { nome: 'Boneco de Neve', cat: 'decoracao', tam: 1, custo: { moedas: 30 }, nivel: 1, alegria: 5 },
   poste: { nome: 'Poste de Luz', cat: 'decoracao', tam: 1, custo: { moedas: 40 }, nivel: 2, alegria: 6 },
   presentes: { nome: 'Pilha de Presentes', cat: 'decoracao', tam: 1, custo: { moedas: 60, doces: 10 }, nivel: 2, alegria: 10 },
@@ -135,7 +137,9 @@ export const TIPOS = {
 // Itens comprados dentro de um prédio: enfeites da árvore, decoração da fachada e
 // móveis. custos[n] leva o item do nível n ao n+1 (0 = ainda não tem) e dá alegria[n].
 // nivelCasa: nível mínimo da casa pra ter o item. precisa: outro item que vem antes.
+const PISCA_PINHEIRO = { luzes: { nome: 'Pisca-pisca', grupo: 'pisca', custos: [{ moedas: 20 }, { moedas: 45 }], alegria: [2, 3] } };
 export const ITENS = {
+  pinheiro: PISCA_PINHEIRO, abeto: PISCA_PINHEIRO, espruce: PISCA_PINHEIRO,
   praca: {
     luzes: { nome: 'Pisca-pisca', grupo: 'arvore', custos: [{ moedas: 20 }, { moedas: 60 }, { moedas: 150 }], alegria: [3, 5, 8] },
     bolas: { nome: 'Bolas coloridas', grupo: 'arvore', custos: [{ moedas: 30 }, { moedas: 80 }, { moedas: 180, doces: 10 }], alegria: [3, 6, 9] },
