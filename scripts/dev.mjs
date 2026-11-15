@@ -14,7 +14,7 @@ const raiz = fileURLToPath(new URL('..', import.meta.url));
 const porta = Number(process.env.PORT) || 8787;
 await mkdir(join(raiz, '.wrangler'), { recursive: true });
 const DB = makeD1(bancoLocal(join(raiz, '.wrangler', 'dev.sqlite')));
-const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json' };
+const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.png': 'image/png', '.svg': 'image/svg+xml', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8' };
 const BLOQUEADO = /^\/(src|test|migrations|scripts|\.wrangler|\.git|node_modules)(\/|$)/;
 
 const ASSETS = {

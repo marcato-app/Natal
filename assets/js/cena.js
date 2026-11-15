@@ -33,9 +33,25 @@ function tex(w, h, draw, rep = [1, 1]) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rep[0], rep[1]); t.anisotropy = 8;
+  t.userData.compartilhado = true;
   return t;
 }
-const rep = (t, x, y) => { const c = t.clone(); c.repeat.set(x, y); c.needsUpdate = true; return c; };
+const rep = (t, x, y) => { const c = t.clone(); c.repeat.set(x, y); c.needsUpdate = true; c.userData.compartilhado = false; return c; };
+
+// Libera da placa de vídeo um modelo que saiu de cena (sem isso a memória só cresce
+// a cada enfeite/nível novo). Materiais, geometrias e texturas compartilhados ficam.
+function liberar(obj) {
+  obj.traverse(o => {
+    if (o.geometry && !o.geometry.userData.compartilhado) o.geometry.dispose();
+    const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+    for (const m of ms) {
+      if (m.userData.compartilhado) continue;
+      for (const k of ['map', 'emissiveMap']) if (m[k] && !m[k].userData.compartilhado) m[k].dispose();
+      m.dispose();
+    }
+    if (o.isInstancedMesh) o.dispose();
+  });
+}
 
 // Centro (no chão) de um prédio com canto em (x,z) e lado tam, em lotes.
 export function centroLote(x, z, tam = 1) {
@@ -772,6 +788,8 @@ function makeTreno() {
 
 // ---------- cena ----------
 export async function criarCena(canvas) {
+  for (const m of [snowMat, glowMat, frameMat, darkMat, stripeMat, bulbMat, wireMat, poolMat, vidroMat, pneuMat]) m.userData.compartilhado = true;
+  bulbGeo.userData.compartilhado = true;
   await Promise.race([document.fonts.load('700 80px Fredoka'), new Promise(r => setTimeout(r, 1500))]).catch(() => {});
   makeSignTex();
 
@@ -1024,7 +1042,7 @@ export async function criarCena(canvas) {
     for (const k of Object.keys(MOVEIS_POS)) {
       const n = it[k] || 0, pos = MOVEIS_POS[k], atual = sala.moveis.get(k);
       if (!atual || atual.n !== n) {
-        if (atual) sala.raiz.remove(atual.obj);
+        if (atual) { sala.raiz.remove(atual.obj); liberar(atual.obj); }
         if (n) {
           const obj = MOVEIS[k](n); obj.position.set(pos.x, 0, pos.z); obj.rotation.y = pos.r; obj.userData.item = k;
           obj.traverse(m => { if (m.isMesh) { m.castShadow = !m.userData.noShadow; m.receiveShadow = true; } });
@@ -1080,11 +1098,11 @@ export async function criarCena(canvas) {
       vivos.add(p.id);
       let e = predios.get(p.id);
       const chave = chaveModelo(p);
-      if (!e || e.chave !== chave) { if (e) raiz.remove(e.obj); const obj = criarModelo(p.tipo, p); obj.userData.predioId = p.id; raiz.add(obj); e = { obj, tipo: p.tipo, chave }; predios.set(p.id, e); }
+      if (!e || e.chave !== chave) { if (e) { raiz.remove(e.obj); liberar(e.obj); } const obj = criarModelo(p.tipo, p); obj.userData.predioId = p.id; raiz.add(obj); e = { obj, tipo: p.tipo, chave }; predios.set(p.id, e); }
       posicionar(e.obj, p);
       e.p = p;
     }
-    for (const [id, e] of predios) if (!vivos.has(id)) { raiz.remove(e.obj); predios.delete(id); }
+    for (const [id, e] of predios) if (!vivos.has(id)) { raiz.remove(e.obj); liberar(e.obj); predios.delete(id); }
     praca = vila.predios.find(p => p.tipo === 'praca') || null;
     const ePraca = praca && predios.get(praca.id);
     if (ePraca && ePraca.obj.userData.brilho) { const c = centroLote(praca.x, praca.z, 4); treeLight.position.set(c.x, 8.5, c.z); treeLight.intensity = ePraca.obj.userData.brilho; treeLight.visible = true; } else treeLight.visible = false;
@@ -1104,7 +1122,7 @@ export async function criarCena(canvas) {
       }
       elfs.get(d.id).d = d;
     });
-    for (const [id, e] of elfs) if (!vivosD.has(id)) { scene.remove(e.obj); elfs.delete(id); }
+    for (const [id, e] of elfs) if (!vivosD.has(id)) { scene.remove(e.obj); liberar(e.obj); elfs.delete(id); }
   }
 
   // ponto onde o duende trabalha: na frente do prédio, lado a lado
@@ -1118,11 +1136,11 @@ export async function criarCena(canvas) {
   // ---------- fantasma (construir/mover) ----------
   function setFantasma(tipo, x, z, r, valido, modelo) {
     if (!tipo) {
-      if (fantasma) { scene.remove(fantasma.obj); fantasma = null; }
+      if (fantasma) { scene.remove(fantasma.obj); liberar(fantasma.obj); fantasma = null; }
       foot.visible = false; return;
     }
     if (!fantasma || fantasma.tipo !== tipo) {
-      if (fantasma) scene.remove(fantasma.obj);
+      if (fantasma) { scene.remove(fantasma.obj); liberar(fantasma.obj); }
       const obj = criarModelo(tipo, modelo);
       obj.traverse(m => { if (m.isMesh) { m.material = m.material.clone(); m.material.transparent = true; m.material.opacity = 0.82; m.castShadow = false; } });
       scene.add(obj); fantasma = { obj, tipo };
@@ -1193,10 +1211,36 @@ export async function criarCena(canvas) {
       const o = MODELOS[k](VITRINE[k]); o.traverse(m => { if (m.isMesh && m.material === poolMat) m.visible = false; });
       s.add(o); const box = new THREE.Box3().setFromObject(o), size = box.getSize(V3()), c = box.getCenter(V3()), dist = Math.max(size.x, size.y, size.z) * 2.1;
       cam.position.copy(c).add(V3(0.75, 0.55, 1).normalize().multiplyScalar(dist)); cam.lookAt(c);
-      tr.render(s, cam); urls[k] = tr.domElement.toDataURL('image/png'); s.remove(o);
+      tr.render(s, cam); urls[k] = tr.domElement.toDataURL('image/png'); s.remove(o); liberar(o);
     }
     tr.dispose(); tr.forceContextLoss();
     return urls;
+  }
+
+  // ---------- qualidade automática ----------
+  // 2 = tudo; 1 = sem brilho (bloom) e resolução menor; 0 = também sem sombras e com menos neve.
+  // Começa na melhor e desce sozinha se o aparelho não aguentar ~40 quadros por segundo.
+  const lerQ = () => { try { return localStorage.getItem('natal.qualidade'); } catch { return null; } };
+  const forcada = new URLSearchParams(location.search).get('qualidade');
+  let qualidade = forcada != null ? Number(forcada) : Number(lerQ() ?? 2);
+  let medQuadros = 0, medTempo = 0, boas = 0, rebaixou = false;
+  function aplicarQualidade(q) {
+    qualidade = Math.max(0, Math.min(2, q));
+    bloom.enabled = qualidade >= 2;
+    moon.castShadow = qualidade >= 1;
+    renderer.setPixelRatio(Math.min(devicePixelRatio, [1, 1.25, coarse ? 1.5 : 2][qualidade]));
+    composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(innerWidth, innerHeight);
+    flakeGeo.setDrawRange(0, qualidade === 0 ? Math.floor(flakeN / 3) : flakeN);
+    try { localStorage.setItem('natal.qualidade', String(qualidade)); } catch { /* sem armazenamento */ }
+  }
+  aplicarQualidade(qualidade);
+  function medirQualidade(dtReal) {
+    if (forcada != null || document.hidden) return;
+    medQuadros++; medTempo += dtReal;
+    if (medTempo < 4) return;
+    const fps = medQuadros / medTempo; medQuadros = 0; medTempo = 0;
+    if (fps < 38 && qualidade > 0) { aplicarQualidade(qualidade - 1); rebaixou = true; boas = 0; }
+    else if (fps > 57 && qualidade < 2 && !rebaixou && ++boas >= 3) { aplicarQualidade(qualidade + 1); boas = 0; }
   }
 
   // ---------- loop ----------
@@ -1204,7 +1248,8 @@ export async function criarCena(canvas) {
   const ouvintes = [];
   const limite = borda + 4;
   function frame() {
-    const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+    const dtReal = clock.getDelta(), dt = Math.min(dtReal, 0.05), t = clock.elapsedTime;
+    medirQualidade(dtReal);
     skyMat.uniforms.uTime.value = t; sky.position.copy(camera.position);
     controls.update();
     // não deixa a câmera fugir da vila
@@ -1365,7 +1410,7 @@ export async function criarCena(canvas) {
     brilhoGeo.attributes.position.needsUpdate = true;
     for (let i = presentesCaindo.length - 1; i >= 0; i--) {
       const pc = presentesCaindo[i]; pc.obj.position.y -= dt * 4; pc.obj.rotation.y += dt * 4; pc.vida -= dt;
-      if (pc.obj.position.y < pc.ate || pc.vida <= 0) { scene.remove(pc.obj); presentesCaindo.splice(i, 1); }
+      if (pc.obj.position.y < pc.ate || pc.vida <= 0) { scene.remove(pc.obj); liberar(pc.obj); presentesCaindo.splice(i, 1); }
     }
   }
 
@@ -1378,6 +1423,8 @@ export async function criarCena(canvas) {
     sincronizar, setFantasma, setDeslocamento, entrarCasa, sairCasa, sincSala, itemEm, posItem, modo: () => modo, setGrade, setSelecionado, esconder, loteEm, predioEm, projetar, topoDe, focar, miniaturas,
     aoQuadro: fn => ouvintes.push(fn),
     papaiNoel, chamineDe, noelVoando: () => noel.voando,
+    qualidade: () => qualidade, setQualidade: aplicarQualidade,
+    memoria: () => ({ ...renderer.info.memory }),
     controls,
   };
 }

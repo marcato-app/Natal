@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#0b1533">
 <title>Vila de Natal</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Nunito:wght@600;700;800;900&display=swap">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/assets/icones/icone-192.png">
+<link rel="apple-touch-icon" href="/assets/icones/icone-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vila de Natal">
 <link rel="stylesheet" href="/assets/css/jogo.css">
 </head>
 <body>
@@ -110,8 +114,8 @@
 
 <script type="importmap">
 { "imports": {
-  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
-  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  "three": "/assets/vendor/three/three.module.min.js",
+  "three/addons/": "/assets/vendor/three/addons/"
 } }
 </script>
 <script type="module" src="/assets/js/jogo.js"></script>

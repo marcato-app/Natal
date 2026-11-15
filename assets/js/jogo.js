@@ -593,6 +593,11 @@ async function iniciar() {
   desenhar();
   cena.aoQuadro(posicionarBaloes);
   $('carregando').classList.add('fora');
+  // guarda o jogo no aparelho pra abrir sem internet (na web; no app ele já vem dentro)
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost') && !window.Capacitor) {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    navigator.storage?.persist?.().catch(() => {});
+  }
   if (!online) toast('Jogando sem conexão: o progresso fica salvo neste aparelho.');
   if (fila.length) agendarEnvio(500);
 
@@ -625,6 +630,6 @@ async function iniciar() {
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') enviar(); });
 }
 // atalho pros testes automáticos (só no servidor local)
-if (location.hostname === 'localhost') window.__teste = { selecionarTipo: (t) => selecionar(estado.predios.find(p => p.tipo === t).id) };
+if (location.hostname === 'localhost') window.__teste = { selecionarTipo: (t) => selecionar(estado.predios.find(p => p.tipo === t).id), memoria: () => cena.memoria(), agir: (a) => agir(a), estado: () => estado };
 
 iniciar();
