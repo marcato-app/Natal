@@ -18,6 +18,8 @@
   <symbol id="i-moedas" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#ffc94d" stroke="#d48a12" stroke-width="2"/><circle cx="12" cy="12" r="5" fill="none" stroke="#d48a12" stroke-width="1.6"/></symbol>
   <symbol id="i-doces" viewBox="0 0 24 24"><path d="M2 7l5 3v4l-5 3z M22 7l-5 3v4l5 3z" fill="#ff8c90"/><circle cx="12" cy="12" r="6" fill="#e5484d"/><path d="M9 10.5c2-2 5-1 5 1.5" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/></symbol>
   <symbol id="i-alegria" viewBox="0 0 24 24"><path d="M12 20.5s-8-4.8-8-10.5a4.5 4.5 0 0 1 8-2.8 4.5 4.5 0 0 1 8 2.8c0 5.7-8 10.5-8 10.5z" fill="#ff8fb1" stroke="#e0567f" stroke-width="1.6"/></symbol>
+  <symbol id="i-estrela" viewBox="0 0 24 24"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17l-5.9 3.3 1.3-6.5L2.5 9.3l6.6-.8z" fill="#ffd76a" stroke="#d99a12" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="i-relogio" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2M9 2h6"/></symbol>
   <symbol id="i-elfo" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19h16"/><path d="M6 19C8 13 10 8 13 4c2 3 4 5 6 6"/><circle cx="19.5" cy="10.5" r="1.6"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></symbol>
   <symbol id="i-ok" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></symbol>
@@ -46,6 +48,7 @@
       <div class="pill glass" title="Moedas"><svg aria-hidden="true"><use href="#i-moedas"/></svg><span id="r-moedas">0</span></div>
       <div class="pill glass" title="Doces"><svg aria-hidden="true"><use href="#i-doces"/></svg><span id="r-doces">0</span></div>
       <div class="pill glass" title="Alegria"><svg aria-hidden="true"><use href="#i-alegria"/></svg><span id="r-alegria">0</span></div>
+      <button type="button" class="pill glass estrelas" id="btn-estrelas" title="Estrelas mágicas"><svg aria-hidden="true"><use href="#i-estrela"/></svg><span id="r-estrelas">0</span></button>
     </div>
   </header>
 
@@ -71,6 +74,7 @@
   <!-- menu construir -->
   <section class="sheet glass" id="sheet-construir" hidden aria-label="Construir">
     <div class="sheet-head"><h2>Construir</h2><button type="button" class="round" data-fechar aria-label="Fechar"><svg aria-hidden="true"><use href="#i-x"/></svg></button></div>
+    <div class="melhoria" id="construtores"></div>
     <div class="tabs" id="tabs"></div>
     <div class="cards" id="cards"></div>
   </section>

@@ -118,6 +118,13 @@ svg { flex-shrink: 0; }
 .act.confirm { background: var(--berry); color: #fff; border: 0; }
 .aviso { padding: 10px 12px; border-radius: 14px; background: rgba(229,72,77,.18); border: 1px solid rgba(229,72,77,.4); font-size: 14px; font-weight: 800; }
 
+button.pill { border: 1px solid var(--line); color: var(--snow); cursor: pointer; }
+.tempo { display: inline-flex; align-items: center; gap: 3px; font-size: 12px; font-weight: 800; color: var(--muted); }
+.tempo svg { width: 12px; height: 12px; }
+.balao.obra { background: #2a3358; color: var(--snow); padding: 6px 10px; font-size: 13px; }
+.balao.obra::after { border-top-color: #2a3358; }
+.balao.obra svg { width: 16px; height: 16px; color: var(--gold); }
+
 /* itens (enfeites, fachada, móveis) */
 .secao { margin: 4px 0 -4px; font: 600 15px/1.2 var(--display); color: var(--muted); }
 .itens { display: flex; flex-direction: column; gap: 6px; }

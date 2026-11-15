@@ -21,6 +21,17 @@ export const NIVEIS = [0, 30, 80, 160, 280, 450, 700, 1000];
 
 export const CUSTO_DUENDE = { doces: 40 };
 
+// Obras e estrelas mágicas (estilo jogo de construir): construir e aumentar levam
+// tempo (TIPOS[x].tempo e melhorias[n].tempo, em segundos; decoração fica pronta na
+// hora). Cada duende construtor toca uma obra por vez. Estrelas são a moeda especial:
+// terminam uma obra na hora e contratam construtores. Ganha ao subir de nível (e,
+// depois, por anúncio e compra).
+export const ESTRELAS_INICIAIS = 25;
+export const ESTRELAS_POR_NIVEL = 5;
+export const MAX_CONSTRUTORES = 3;
+export const CUSTO_CONSTRUTOR = [0, 150, 300];   // estrelas pro construtor nº 2 e nº 3 (índice = quantos já tem)
+export const custoAcelerar = (segundos) => Math.max(1, Math.ceil(segundos / 60));
+
 // Aluguel das casas: só casa enfeitada recebe o Papai Noel, que recolhe o aluguel e
 // deixa um presente (doces). Rende a cada ALUGUEL_CICLO segundos, sem precisar de duende.
 export const ALUGUEL_CICLO = 120;
@@ -47,16 +58,16 @@ export const RECURSOS = {
 export const TIPOS = {
   praca: { nome: 'Praça da Árvore', cat: null, tam: 4, custo: {}, nivel: 1, vendavel: false },
   casa: {
-    nome: 'Casinha', cat: 'casas', tam: 3, custo: { moedas: 150 }, nivel: 1,
+    nome: 'Casinha', cat: 'casas', tam: 3, custo: { moedas: 150 }, nivel: 1, tempo: 60,
     moradia: [4, 6, 8], // por nível da casa
     melhorias: [         // melhorias[n-1] leva do nível n ao n+1
-      { custo: { moedas: 300, doces: 30 }, nivelVila: 2, alegria: 10 },
-      { custo: { moedas: 700, doces: 80 }, nivelVila: 4, alegria: 20 },
+      { custo: { moedas: 300, doces: 30 }, nivelVila: 2, alegria: 10, tempo: 300 },
+      { custo: { moedas: 700, doces: 80 }, nivelVila: 4, alegria: 20, tempo: 900 },
     ],
   },
-  padaria: { nome: 'Padaria de Biscoitos', cat: 'producao', tam: 3, custo: { moedas: 250 }, nivel: 1, prod: { recurso: 'doces', qtd: 15, ciclo: 90, vagas: 2 } },
-  fabrica: { nome: 'Fábrica de Brinquedos', cat: 'producao', tam: 4, custo: { moedas: 400 }, nivel: 2, prod: { recurso: 'moedas', qtd: 40, ciclo: 60, vagas: 3 } },
-  rinque: { nome: 'Rinque de Patinação', cat: 'diversao', tam: 4, custo: { moedas: 600, doces: 50 }, nivel: 3, prod: { recurso: 'alegria', qtd: 12, ciclo: 120, vagas: 2 } },
+  padaria: { nome: 'Padaria de Biscoitos', cat: 'producao', tam: 3, custo: { moedas: 250 }, nivel: 1, tempo: 120, prod: { recurso: 'doces', qtd: 15, ciclo: 90, vagas: 2 } },
+  fabrica: { nome: 'Fábrica de Brinquedos', cat: 'producao', tam: 4, custo: { moedas: 400 }, nivel: 2, tempo: 300, prod: { recurso: 'moedas', qtd: 40, ciclo: 60, vagas: 3 } },
+  rinque: { nome: 'Rinque de Patinação', cat: 'diversao', tam: 4, custo: { moedas: 600, doces: 50 }, nivel: 3, tempo: 600, prod: { recurso: 'alegria', qtd: 12, ciclo: 120, vagas: 2 } },
   pinheiro: { nome: 'Pinheiro', cat: 'decoracao', tam: 1, custo: { moedas: 15 }, nivel: 1, alegria: 2 },
   boneco: { nome: 'Boneco de Neve', cat: 'decoracao', tam: 1, custo: { moedas: 30 }, nivel: 1, alegria: 5 },
   poste: { nome: 'Poste de Luz', cat: 'decoracao', tam: 1, custo: { moedas: 40 }, nivel: 2, alegria: 6 },
@@ -117,8 +128,25 @@ export function alegriaAoConstruir(tipo) {
   return t.alegria ?? Math.floor((t.custo.moedas || 0) / 50);
 }
 
-// Moradia de um prédio (casas crescem com o nível).
+// Ganha alegria; subir de nível dá estrelas.
+export function ganharAlegria(v, q) {
+  const antes = nivelDe(v.alegria);
+  v.alegria += q;
+  const depois = nivelDe(v.alegria);
+  if (depois > antes) v.estrelas = (v.estrelas || 0) + ESTRELAS_POR_NIVEL * (depois - antes);
+}
+
+const ehEnfeite = (o) => o.tipo === 'enfeite' || (!o.tipo && !!o.item);
+export const emConstrucao = (p) => !!(p.obra && p.obra.tipo === 'construir');
+// Obras que ocupam construtor (enfeitar a árvore é com os moradores, não conta).
+export function obrasDeConstrutor(v) {
+  return v.predios.filter(p => p.obra && !ehEnfeite(p.obra)).length;
+}
+export function construtores(v) { return v.construtores || 1; }
+
+// Moradia de um prédio (casas crescem com o nível; casa em construção ainda não abriga).
 export function moradiaDe(p) {
+  if (emConstrucao(p)) return 0;
   const m = TIPOS[p.tipo].moradia;
   return Array.isArray(m) ? m[(p.nv || 1) - 1] : (m || 0);
 }
@@ -196,7 +224,7 @@ export function prontos(p) {
 export function novaVila(agora) {
   const v = {
     v: VERSAO, t: agora, seq: 0,
-    moedas: 500, doces: 60, alegria: 0,
+    moedas: 500, doces: 60, alegria: 0, estrelas: ESTRELAS_INICIAIS, construtores: 1,
     predios: [], duendes: [],
   };
   const add = (tipo, x, z) => { const p = { id: 'p' + (++v.seq), tipo, x, z, r: 0, prog: 0 }; if (ITENS[tipo]) p.itens = {}; if (TIPOS[tipo].melhorias) p.nv = 1; v.predios.push(p); return p; };
@@ -218,12 +246,8 @@ export function avancar(v, agora) {
   const dt = (agora - v.t) / 1000;
   if (!(dt > 0)) return;
   for (const p of v.predios) {
-    if (p.obra && agora >= p.obra.fim) {
-      const def = ITENS[p.tipo][p.obra.item], n = nivelItem(p, p.obra.item);
-      p.itens = { ...(p.itens || {}), [p.obra.item]: n + 1 };
-      v.alegria += def.alegria[n];
-      delete p.obra;
-    }
+    if (p.obra && agora >= p.obra.fim) concluirObra(v, p);
+    if (emConstrucao(p)) continue;
     if (aluguelDe(p)) { p.prog = Math.min(ESTOQUE_MAX, (p.prog || 0) + dt / ALUGUEL_CICLO); continue; }
     const pr = TIPOS[p.tipo].prod;
     if (!pr) continue;
@@ -232,6 +256,22 @@ export function avancar(v, agora) {
     p.prog = Math.min(ESTOQUE_MAX, (p.prog || 0) + dt * (n / pr.vagas) / pr.ciclo);
   }
   v.t = agora;
+}
+
+function concluirObra(v, p) {
+  const o = p.obra;
+  delete p.obra;
+  if (ehEnfeite(o)) {
+    const def = ITENS[p.tipo][o.item], n = nivelItem(p, o.item);
+    p.itens = { ...(p.itens || {}), [o.item]: n + 1 };
+    ganharAlegria(v, def.alegria[n]);
+  } else if (o.tipo === 'construir') {
+    ganharAlegria(v, alegriaAoConstruir(p.tipo));
+  } else if (o.tipo === 'melhorar') {
+    const m = TIPOS[p.tipo].melhorias[(p.nv || 1) - 1];
+    p.nv = (p.nv || 1) + 1;
+    ganharAlegria(v, m ? m.alegria : 0);
+  }
 }
 
 /* ------------------------------ ações ------------------------------ */
@@ -251,13 +291,15 @@ export function aplicar(v, a, agora) {
       if (nivelDe(v.alegria) < t.nivel) return erro(`Libera no nível ${t.nivel}`);
       if (!podePagar(v, t.custo)) return erro('Recursos insuficientes');
       if (!cabe(v, a.x, a.z, t.tam)) return erro('Não cabe aqui');
+      if (t.tempo && obrasDeConstrutor(v) >= construtores(v)) return erro('Todos os construtores estão ocupados');
       pagar(v, t.custo);
       const p = { id: 'p' + (++v.seq), tipo: a.predio, x: a.x, z: a.z, r: (a.r | 0) & 3, prog: 0 };
       if (ITENS[a.predio]) p.itens = {};
       if (t.melhorias) p.nv = 1;
       v.predios.push(p);
+      if (t.tempo) { p.obra = { tipo: 'construir', fim: agora + t.tempo * 1000 }; return { ok: true, id: p.id, obra: p.obra }; }
       const ganho = alegriaAoConstruir(a.predio);
-      v.alegria += ganho;
+      ganharAlegria(v, ganho);
       return { ok: true, id: p.id, ganho: { alegria: ganho } };
     }
 
@@ -289,7 +331,7 @@ export function aplicar(v, a, agora) {
         if (k < 1 || !aluguelDe(p)) return erro('Nada pronto ainda');
         p.prog -= k;
         const ganho = { moedas: k * aluguelDe(p), doces: k * PRESENTE_DOCES, alegria: k };
-        for (const [r, q] of Object.entries(ganho)) v[r] += q;
+        for (const [r, q] of Object.entries(ganho)) r === 'alegria' ? ganharAlegria(v, q) : (v[r] += q);
         return { ok: true, ganho };
       }
       const pr = p && TIPOS[p.tipo].prod;
@@ -299,7 +341,7 @@ export function aplicar(v, a, agora) {
       p.prog -= k;
       const ganho = { [pr.recurso]: k * pr.qtd };
       if (pr.recurso !== 'alegria') ganho.alegria = k;
-      for (const [r, q] of Object.entries(ganho)) v[r] += q;
+      for (const [r, q] of Object.entries(ganho)) r === 'alegria' ? ganharAlegria(v, q) : (v[r] += q);
       return { ok: true, ganho };
     }
 
@@ -319,6 +361,7 @@ export function aplicar(v, a, agora) {
       const p = predio(v, a.predio);
       const pr = p && TIPOS[p.tipo].prod;
       if (!pr) return erro('Esse prédio não precisa de duendes');
+      if (emConstrucao(p)) return erro('O prédio ainda está em obra');
       if (d.predio !== p.id && duendesEm(v, p.id) >= pr.vagas) return erro('Sem vaga nesse prédio');
       d.predio = p.id;
       return { ok: true };
@@ -331,11 +374,13 @@ export function aplicar(v, a, agora) {
       const m = ms[(p.nv || 1) - 1];
       if (!m) return erro('Já está no nível máximo');
       if (nivelDe(v.alegria) < m.nivelVila) return erro(`Precisa da vila no nível ${m.nivelVila}`);
+      if (p.obra) return erro('Espere a obra terminar');
+      if (obrasDeConstrutor(v) >= construtores(v)) return erro('Todos os construtores estão ocupados');
       if (!podePagar(v, m.custo)) return erro('Recursos insuficientes');
       pagar(v, m.custo);
-      p.nv = (p.nv || 1) + 1;
-      v.alegria += m.alegria;
-      return { ok: true, ganho: { alegria: m.alegria } };
+      p.obra = { tipo: 'melhorar', fim: agora + (m.tempo || 0) * 1000 };
+      if (!m.tempo) concluirObra(v, p);
+      return { ok: true, obra: p.obra || null };
     }
 
     case 'item': {
@@ -346,15 +391,35 @@ export function aplicar(v, a, agora) {
       if (motivo) return erro(motivo);
       const def = ITENS[p.tipo][a.item], n = nivelItem(p, a.item);
       if (p.tipo === 'praca' && p.obra) return erro('Os moradores ainda estão enfeitando');
+      if (p.obra) return erro('Espere a obra terminar');
       if (!podePagar(v, def.custos[n])) return erro('Recursos insuficientes');
       pagar(v, def.custos[n]);
       if (p.tipo === 'praca') {
-        p.obra = { item: a.item, fim: agora + TEMPO_ENFEITE(n) * 1000 };
+        p.obra = { tipo: 'enfeite', item: a.item, fim: agora + TEMPO_ENFEITE(n) * 1000 };
         return { ok: true, obra: p.obra };
       }
       p.itens = { ...(p.itens || {}), [a.item]: n + 1 };
-      v.alegria += def.alegria[n];
+      ganharAlegria(v, def.alegria[n]);
       return { ok: true, nivel: n + 1, ganho: { alegria: def.alegria[n] } };
+    }
+
+    case 'acelerar': {
+      const p = predio(v, a.id);
+      if (!p || !p.obra) return erro('Nada em obra aqui');
+      const custo = custoAcelerar((p.obra.fim - agora) / 1000);
+      if ((v.estrelas || 0) < custo) return erro('Estrelas insuficientes');
+      v.estrelas -= custo;
+      concluirObra(v, p);
+      return { ok: true, custo };
+    }
+
+    case 'construtor': {
+      const n = construtores(v);
+      if (n >= MAX_CONSTRUTORES) return erro('Já tem todos os construtores');
+      if ((v.estrelas || 0) < CUSTO_CONSTRUTOR[n]) return erro('Estrelas insuficientes');
+      v.estrelas -= CUSTO_CONSTRUTOR[n];
+      v.construtores = n + 1;
+      return { ok: true };
     }
 
     default:

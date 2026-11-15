@@ -44,6 +44,17 @@ Three.js (0.160.0) vem do jsDelivr pelo importmap do `index.html`.
   floresta; trem a vapor com vagões de presentes no trilho atrás da vila; moradores
   passeando.
 
+### Obras, construtores e estrelas (estilo jogo de construir)
+
+- Construir (`TIPOS[x].tempo`) e aumentar a casa (`melhorias[n].tempo`) abrem uma obra
+  (`p.obra = { tipo: 'construir' | 'melhorar', fim }`); decoração fica pronta na hora.
+  Prédio em construção não produz, não abriga e não aceita duende.
+- Cada duende construtor (`v.construtores`, começa com 1, máx. 3) toca uma obra por vez.
+- **Estrelas mágicas** (`v.estrelas`): moeda especial. `acelerar` termina qualquer obra
+  (1 estrela por minuto que falta, `custoAcelerar`); `construtor` contrata mais um
+  (`CUSTO_CONSTRUTOR`). Ganha `ESTRELAS_POR_NIVEL` a cada nível (`ganharAlegria`). É a
+  moeda que anúncio recompensado e compras vão dar.
+
 ### Como o salvamento funciona
 
 A vila inteira é um JSON (formato em `regras.js`, gravado em `vilas.estado`). O

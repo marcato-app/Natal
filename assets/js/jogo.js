@@ -6,13 +6,14 @@ import {
   TIPOS, CATEGORIAS, CUSTO_DUENDE, ESTOQUE_MAX, ITENS,
   novaVila, aplicar, avancar, cabe, predio, duendesEm, moradia, moradiaDe, prontos, podePagar,
   nivelItem, bloqueioItem, aluguelDe, ALUGUEL_CICLO, PRESENTE_DOCES,
+  emConstrucao, obrasDeConstrutor, construtores, custoAcelerar, TEMPO_ENFEITE, CUSTO_CONSTRUTOR, MAX_CONSTRUTORES, ESTRELAS_POR_NIVEL,
   nivelDe, progressoNivel, alegriaAoConstruir,
 } from './regras.js';
 import { criarCena } from './cena.js';
 
 const $ = (id) => document.getElementById(id);
 const fmt = (n) => Math.floor(n).toLocaleString('pt-BR');
-const ICONE = { moedas: 'i-moedas', doces: 'i-doces', alegria: 'i-alegria' };
+const ICONE = { moedas: 'i-moedas', doces: 'i-doces', alegria: 'i-alegria', estrelas: 'i-estrela' };
 const svg = (id, cls = '') => `<svg class="${cls}" aria-hidden="true"><use href="#${id}"/></svg>`;
 const NOME_RECURSO = { moedas: 'moedas', doces: 'doces', alegria: 'alegria' };
 
@@ -126,7 +127,7 @@ function toast(msg) {
 
 function subiuNivel(n) {
   const novos = Object.values(TIPOS).filter(t => t.cat && t.nivel === n).map(t => t.nome);
-  toast(`Nível ${n}!` + (novos.length ? ` Liberou: ${novos.join(', ')}` : ''));
+  toast(`Nível ${n}! +${ESTRELAS_POR_NIVEL} estrelas` + (novos.length ? ` · Liberou: ${novos.join(', ')}` : ''));
 }
 
 function custoHtml(custo) {
@@ -142,8 +143,8 @@ function desenharHud() {
     $('xp-barra').style.width = `${Math.min(100, (estado.alegria - pn.atual) / (pn.proximo - pn.atual) * 100)}%`;
     $('xp-texto').textContent = `${fmt(estado.alegria)} / ${fmt(pn.proximo)} alegria`;
   }
-  for (const r of ['moedas', 'doces', 'alegria']) {
-    const el = $('r-' + r), v = Math.floor(estado[r]);
+  for (const r of ['moedas', 'doces', 'alegria', 'estrelas']) {
+    const el = $('r-' + r), v = Math.floor(estado[r] || 0);
     if (ultimos[r] !== undefined && v > ultimos[r]) { el.parentElement.classList.remove('pulse'); void el.offsetWidth; el.parentElement.classList.add('pulse'); }
     ultimos[r] = v; el.textContent = fmt(v);
   }
@@ -197,7 +198,19 @@ $('tabs').addEventListener('click', (e) => {
   const b = e.target.closest('[data-aba]'); if (!b) return;
   abaConstrucao = b.dataset.aba; desenharAbas(); desenharCards();
 });
+function desenharConstrutores() {
+  const n = construtores(estado), ocup = obrasDeConstrutor(estado);
+  const prox = n < MAX_CONSTRUTORES ? CUSTO_CONSTRUTOR[n] : null;
+  $('construtores').innerHTML = `<div class="item-info"><b>Duendes construtores: ${n - ocup} livre${n - ocup === 1 ? '' : 's'} de ${n}</b><small>Cada um toca uma obra por vez</small></div>` +
+    (prox != null ? `<button type="button" class="buy ${(estado.estrelas || 0) >= prox ? '' : 'caro'}" data-construtor>+ Construtor<span class="cost"><span>${svg('i-estrela')}${prox}</span></span></button>` : `<span class="completo">${svg('i-ok')}Equipe completa</span>`);
+}
+$('construtores').addEventListener('click', (e) => {
+  if (!e.target.closest('[data-construtor]')) return;
+  const r = agir({ tipo: 'construtor' });
+  if (r.ok) toast('Novo duende construtor chegou!');
+});
 function desenharCards() {
+  desenharConstrutores();
   const nivel = nivelDe(estado.alegria);
   $('cards').innerHTML = Object.entries(TIPOS).filter(([, t]) => t.cat === abaConstrucao).map(([k, t]) => {
     const travado = nivel < t.nivel;
@@ -206,6 +219,7 @@ function desenharCards() {
       ${travado ? `<span class="lock">${svg('i-cadeado')}Nível ${t.nivel}</span>` : ''}
       <b>${t.nome}</b>
       <span class="cost">${travado ? 'Bloqueado' : custoHtml(t.custo)}</span>
+      ${!travado && t.tempo ? `<span class="tempo">${svg('i-relogio')}${tempoTexto(t.tempo)}</span>` : ''}
     </button>`;
   }).join('');
 }
@@ -230,7 +244,14 @@ function desenharPredio() {
   $('pd-thumb').src = thumbs[p.tipo] || '';
   $('pd-nome').textContent = t.nome;
   let corpo = '';
-  if (t.prod) {
+  if (emConstrucao(p)) {
+    const rest = Math.max(0, (p.obra.fim - agora()) / 1000);
+    const chave = JSON.stringify(['obra', p.id, Math.ceil(rest), Math.floor(estado.estrelas || 0), vendaPendente]);
+    if (chave === desenharPredio.chave) return;
+    desenharPredio.chave = chave;
+    $('pd-sub').textContent = 'Em construção';
+    corpo = blocoObra(p);
+  } else if (t.prod) {
     const pr = t.prod, n = Math.min(duendesEm(estado, p.id), pr.vagas), k = prontos(p);
     const frac = (p.prog || 0) - k, cheio = k >= ESTOQUE_MAX;
     const falta = n ? (1 - frac) * pr.ciclo * pr.vagas / n : Infinity;
@@ -258,18 +279,21 @@ function desenharPredio() {
     }
     corpo += `</div>`;
   } else {
-    const chave = JSON.stringify([p.id, p.r, p.nv, p.itens, p.obra, p.obra ? Math.ceil((p.obra.fim - agora()) / 1000) : 0, prontos(p), Math.floor(estado.moedas), Math.floor(estado.doces), nivelDe(estado.alegria), estado.duendes.length, vendaPendente]);
+    const chave = JSON.stringify([p.id, p.r, p.nv, p.itens, p.obra, p.obra ? Math.ceil((p.obra.fim - agora()) / 1000) : 0, prontos(p), Math.floor(estado.moedas), Math.floor(estado.doces), Math.floor(estado.estrelas || 0), nivelDe(estado.alegria), estado.duendes.length, vendaPendente]);
     if (chave === desenharPredio.chave) return;
     desenharPredio.chave = chave;
   }
   if (t.prod) { /* já preenchido acima */ }
+  else if (emConstrucao(p)) { /* já preenchido acima */ }
   else if (p.tipo === 'casa') {
     const nv = p.nv || 1, m = t.melhorias[nv - 1];
+    if (p.obra) corpo += blocoObra(p);
     $('pd-sub').textContent = `Nível ${nv} · abriga ${moradiaDe(p)} duendes`;
     let alvo;
     if (!m) alvo = `<span class="completo">${svg('i-ok')}Nível máximo</span>`;
     else if (nivelDe(estado.alegria) < m.nivelVila) alvo = `<span class="bloq">${svg('i-cadeado')}Vila nível ${m.nivelVila}</span>`;
-    else alvo = `<button type="button" class="buy ${podePagar(estado, m.custo) ? '' : 'caro'}" data-acao="melhorar">Aumentar <span class="cost">${custoHtml(m.custo)}</span></button>`;
+    else if (p.obra) alvo = `<span class="bloq">${svg('i-relogio')}Em obra</span>`;
+    else alvo = `<button type="button" class="buy ${podePagar(estado, m.custo) ? '' : 'caro'}" data-acao="melhorar">Aumentar <span class="cost">${custoHtml(m.custo)}</span><span class="tempo">${svg('i-relogio')}${tempoTexto(m.tempo)}</span></button>`;
     corpo += `<div class="melhoria"><div class="item-info"><b>Aumentar a casa</b><small>${m ? `Nível ${nv + 1}: ${t.moradia[nv]} duendes, ${nv === 1 ? 'uma ala nova' : 'segundo andar'} e mais móveis` : `A vila tem lugar pra ${moradia(estado)} duendes`}</small></div>${alvo}</div>`;
     const alu = aluguelDe(p);
     corpo += `<p class="info">${alu ? `Aluguel: +${alu} moedas e ${PRESENTE_DOCES} doces a cada ${tempoTexto(ALUGUEL_CICLO)}. O Papai Noel passa, deixa um presente e recolhe pra você. Mais enfeites, mais aluguel.` : 'Enfeite a fachada pra o Papai Noel passar aqui: ele deixa presente e recolhe o aluguel.'}</p>`;
@@ -278,6 +302,7 @@ function desenharPredio() {
   } else if (p.tipo === 'praca') {
     const it = p.itens || {}, total = Object.values(ITENS.praca).reduce((s2, d) => s2 + d.custos.length, 0), feitos = Object.keys(ITENS.praca).reduce((s2, k) => s2 + nivelItem(p, k), 0);
     $('pd-sub').textContent = p.obra ? `Os moradores estão pendurando: ${ITENS.praca[p.obra.item].nome}` : feitos === total ? 'Árvore completa!' : `Os moradores enfeitam a árvore: ${feitos} de ${total} enfeites`;
+    if (p.obra) corpo += blocoObra(p);
     corpo += `<div class="itens">${linhasItens(p, 'arvore')}</div>`;
   } else {
     $('pd-sub').textContent = `Decoração · deu +${alegriaAoConstruir(p.tipo)} alegria`;
@@ -300,7 +325,8 @@ function desenharPredio() {
 $('pd-corpo').addEventListener('click', (e) => {
   const it = e.target.closest('[data-item]'); if (it) { comprarItem(selecionado, it.dataset.item); return; }
   const ac = e.target.closest('[data-acao]');
-  if (ac && ac.dataset.acao === 'melhorar') { const r = agir({ tipo: 'melhorar', id: selecionado }); if (r.ok) toast(`Casa aumentada! +${r.ganho.alegria} alegria`); return; }
+  if (ac && ac.dataset.acao === 'melhorar') { const r = agir({ tipo: 'melhorar', id: selecionado }); if (r.ok) toast('Os construtores começaram a aumentar a casa!'); return; }
+  if (ac && ac.dataset.acao === 'acelerar') { const r = agir({ tipo: 'acelerar', id: selecionado }); if (r.ok) { toast(`Pronto! −${r.custo} estrela${r.custo > 1 ? 's' : ''}`); desenharPredio.chave = null; desenharPredio(); } return; }
   if (ac && ac.dataset.acao === 'entrar') { entrar(selecionado); return; }
   const tirar = e.target.closest('[data-tirar]'); if (tirar) { agir({ tipo: 'alocar', duende: tirar.dataset.tirar, predio: null }); return; }
   const col = e.target.closest('[data-colocar]'); if (col) agir({ tipo: 'alocar', duende: col.dataset.colocar, predio: selecionado });
@@ -316,6 +342,17 @@ $('pd-acoes').addEventListener('click', (e) => {
     case 'vender-ok': { const r = agir({ tipo: 'vender', id: p.id }); if (r.ok) { toast(`Vendido! ${Object.entries(r.ganho).map(([k, v]) => `+${fmt(v)} ${k}`).join(' ')}`); fechar(); } break; }
   }
 });
+
+// Obra em andamento: cronômetro, barra e "terminar agora" com estrelas.
+function blocoObra(p) {
+  const o = p.obra, rest = Math.max(0, (o.fim - agora()) / 1000), t = TIPOS[p.tipo];
+  const total = o.tipo === 'construir' ? t.tempo : o.tipo === 'melhorar' ? t.melhorias[(p.nv || 1) - 1].tempo : TEMPO_ENFEITE(nivelItem(p, o.item));
+  const nome = o.tipo === 'construir' ? 'Os construtores estão erguendo o prédio' : o.tipo === 'melhorar' ? `Aumentando pro nível ${(p.nv || 1) + 1}` : `Moradores pendurando: ${ITENS.praca[o.item].nome}`;
+  const custo = custoAcelerar(rest);
+  return `<div class="prod"><div class="row"><b>${nome}</b><span class="timer">${tempoTexto(rest)}</span></div>
+    <div class="bar"><i style="width:${Math.min(100, (1 - rest / Math.max(1, total)) * 100)}%"></i></div></div>
+    <button type="button" class="cta gold largo" data-acao="acelerar" ${(estado.estrelas || 0) >= custo ? '' : 'disabled'}>Terminar agora · ${svg('i-estrela')} ${custo}</button>`;
+}
 
 // Itens (enfeites da árvore, fachada, móveis)
 function linhasItens(p, grupo) {
@@ -405,6 +442,7 @@ function desenharDuendes() {
   if (n >= cap) { btn.disabled = true; btn.innerHTML = 'Construa uma casa pra mais duendes'; }
   else { btn.disabled = !podePagar(estado, CUSTO_DUENDE); btn.innerHTML = `Contratar duende · ${svg('i-doces')} ${CUSTO_DUENDE.doces}`; }
 }
+$('btn-estrelas').addEventListener('click', () => toast(`Estrelas mágicas: terminam obras na hora e contratam construtores. Ganhe ${ESTRELAS_POR_NIVEL} a cada nível.`));
 $('dd-lista').addEventListener('click', (e) => { const b = e.target.closest('[data-ver]'); if (b) selecionar(b.dataset.ver); });
 $('dd-contratar').addEventListener('click', () => {
   const r = agir({ tipo: 'contratar' });
@@ -444,8 +482,11 @@ function sincBaloes() {
   for (const p of estado.predios) {
     const pr = TIPOS[p.tipo].prod, aluguel = aluguelDe(p);
     let html = null, cls = 'balao', rotulo = '';
-    if (p.tipo === 'praca' && p.obra) {
-      html = `${svg('i-martelo')}enfeitando ${tempoTexto((p.obra.fim - agora()) / 1000)}`; cls += ' parado'; rotulo = 'Moradores enfeitando a árvore';
+    let modo = 'coletar';
+    if (p.obra) {
+      const enf = p.tipo === 'praca';
+      html = `${svg(enf ? 'i-martelo' : 'i-relogio')}${enf ? 'enfeitando ' : ''}${tempoTexto((p.obra.fim - agora()) / 1000)}`; cls += ' obra'; modo = 'abrir';
+      rotulo = enf ? 'Moradores enfeitando a árvore' : `${TIPOS[p.tipo].nome} em obra`;
     } else if (p.tipo === 'casa') {
       const k = prontos(p);
       if (aluguel && k >= 1) { html = `${svg('i-moedas')}+${fmt(k * aluguel)}`; rotulo = `Recolher ${fmt(k * aluguel)} moedas de aluguel`; }
@@ -460,12 +501,13 @@ function sincBaloes() {
     let el = baloes.get(p.id);
     if (!el) {
       el = document.createElement('button'); el.type = 'button';
-      el.addEventListener('click', () => { if (!colocando) coletar(p.id); });
+      el.addEventListener('click', () => { if (colocando) return; if (el.dataset.modo === 'abrir') selecionar(p.id); else coletar(p.id); });
       $('baloes').appendChild(el); baloes.set(p.id, el);
     }
     if (el.innerHTML !== html) el.innerHTML = html;
     el.className = cls;
     el.setAttribute('aria-label', rotulo);
+    el.dataset.modo = modo;
   }
   for (const [id, el] of baloes) if (!vivos.has(id)) { el.remove(); baloes.delete(id); }
 }
@@ -532,8 +574,8 @@ $('place-ok').addEventListener('click', () => {
   terminarColocar();
   if (!c.moverId) {
     const t = TIPOS[c.tipo];
-    toast(t.prod ? `${t.nome} construída! Coloque duendes nela.` : `${t.nome} construída! +${r.ganho.alegria} alegria`);
-    if (t.prod) selecionar(r.id);
+    if (r.obra) toast(`Obra começou! ${t.nome} fica pronta em ${tempoTexto(t.tempo)}`);
+    else toast(`${t.nome} pronta! +${r.ganho.alegria} alegria`);
   }
 });
 function moverFantasmaPara(cx, cy) {
@@ -603,9 +645,11 @@ async function iniciar() {
 
   // o tempo passa: produção anda e os balões aparecem
   setInterval(() => {
-    const nivelAntes = nivelDe(estado.alegria), obraAntes = estado.predios.find(p => p.obra);
+    const nivelAntes = nivelDe(estado.alegria), obras = estado.predios.filter(p => p.obra).map(p => [p, p.obra.tipo || 'enfeite']);
     avancar(estado, agora());
-    if (obraAntes && !obraAntes.obra) { toast('Os moradores terminaram de enfeitar a árvore!'); cena.sincronizar(estado); }
+    const prontas = obras.filter(([p]) => !p.obra);
+    for (const [p, tipo] of prontas) toast(tipo === 'construir' ? `${TIPOS[p.tipo].nome} pronta!${TIPOS[p.tipo].prod ? ' Coloque duendes nela.' : ''}` : tipo === 'melhorar' ? `Casa aumentada pro nível ${p.nv}!` : 'Os moradores terminaram de enfeitar a árvore!');
+    if (prontas.length) cena.sincronizar(estado);
     if (nivelDe(estado.alegria) > nivelAntes) subiuNivel(nivelDe(estado.alegria));
     desenharHud();
     sincBaloes();

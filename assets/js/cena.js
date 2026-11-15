@@ -478,11 +478,16 @@ export const MODELOS = {
 };
 // p = o prédio (nível e itens mudam o modelo). Sem p, sai a versão "de vitrine" pro menu.
 function criarModelo(tipo, p) {
-  const o = MODELOS[tipo](p);
+  let o;
+  if (p && p.obra && p.obra.tipo === 'construir') { o = makeCanteiro(TIPOS[tipo].tam); o.userData.altura = TIPOS[tipo].tam >= 3 ? 7 : 2.5; }
+  else {
+    o = MODELOS[tipo](p || undefined);
+    if (p && p.obra && p.obra.tipo === 'melhorar') { const a = makeAndaime(TIPOS[tipo].tam * T * 0.95, (o.userData.altura || 6) - 0.5); o.add(a); }
+  }
   o.traverse(m => { if (m.isMesh) { m.castShadow = !m.userData.noShadow; m.receiveShadow = true; } });
   return o;
 }
-const chaveModelo = (p) => `${p.tipo}|${p.nv || 1}|${JSON.stringify(p.itens || {})}`;
+const chaveModelo = (p) => `${p.tipo}|${p.nv || 1}|${JSON.stringify(p.itens || {})}|${p.obra && p.obra.tipo !== 'enfeite' ? p.obra.tipo : ''}`;
 
 function makeElf(color = 0x2e9e5b) {
   const g = new THREE.Group();
@@ -500,9 +505,60 @@ function makeElf(color = 0x2e9e5b) {
   hat.add(mesh(new THREE.ConeGeometry(0.31, 0.78, 16), red, 0, 0.39, 0));
   const brim = mesh(new THREE.TorusGeometry(0.29, 0.07, 8, 20), white, 0, 0.02, 0); brim.rotation.x = Math.PI / 2; hat.add(brim);
   hat.add(mesh(new THREE.SphereGeometry(0.1, 10, 8), white, 0, 0.8, 0));
-  g.userData = { arms, legs };
+  g.userData = { arms, legs, hat };
   g.scale.setScalar(1.15);
   return shadowAll(g);
+}
+// Duende construtor: capacete amarelo e martelo.
+function makeConstrutor() {
+  const g = makeElf(0xe0902a);
+  g.userData.hat.visible = false;
+  const amarelo = mat(0xffc629, { roughness: 0.4 });
+  g.add(mesh(new THREE.SphereGeometry(0.34, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), amarelo, 0, 1.62, 0));
+  g.add(mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.05, 16), amarelo, 0, 1.63, 0.05));
+  const martelo = new THREE.Group(); martelo.position.set(0, -0.45, 0.08);
+  martelo.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.4, 6), mat(0x8a5a3c), 0, -0.1, 0.12).rotateX(Math.PI / 2));
+  martelo.add(mesh(new THREE.BoxGeometry(0.12, 0.12, 0.26), darkMat, 0, -0.1, 0.32));
+  g.userData.arms[1].add(martelo);
+  return shadowAll(g);
+}
+
+// Canteiro de obra (prédio sendo construído) e andaime (prédio sendo aumentado).
+const madeiraObra = () => mat(0xb07a48, { roughness: 0.85 });
+function makeAndaime(lado, altura) {
+  const g = new THREE.Group(), m = madeiraObra(), h = lado / 2;
+  for (const x of [-h, h]) for (const z of [-h, h]) g.add(mesh(new THREE.BoxGeometry(0.16, altura, 0.16), m, x, altura / 2, z));
+  for (let y = 1.6; y < altura; y += 1.8) {
+    for (const z of [-h, h]) g.add(mesh(new THREE.BoxGeometry(lado, 0.12, 0.5), m, 0, y, z));
+    for (const x of [-h, h]) g.add(mesh(new THREE.BoxGeometry(0.5, 0.12, lado), m, x, y, 0));
+  }
+  const diag = mesh(new THREE.BoxGeometry(0.08, Math.hypot(lado, altura), 0.08), m, 0, altura / 2, h); diag.rotation.z = Math.atan2(lado, altura); g.add(diag);
+  return g;
+}
+function makeCanteiro(tam) {
+  const g = new THREE.Group(), L = tam * T * 0.9;
+  g.add(mesh(rbox(L, 0.12, L, 0.05), mat(0x8a6a50, { roughness: 1 }), 0, 0.06, 0));
+  if (tam === 1) {
+    g.add(mesh(rbox(0.8, 0.6, 0.8, 0.05), madeiraObra(), 0, 0.42, 0));
+    return g;
+  }
+  const alt = tam >= 4 ? 5 : 3.8;
+  g.add(makeAndaime(L * 0.7, alt));
+  g.add(mesh(rbox(L * 0.66, 0.4, L * 0.66, 0.05), mat(0x9aa1b0, { roughness: 0.95 }), 0, 0.3, 0));
+  // pilha de tábuas e caixotes
+  for (let i = 0; i < 4; i++) g.add(mesh(new THREE.BoxGeometry(2.2, 0.14, 0.4), madeiraObra(), -L * 0.32, 0.2 + i * 0.15, L * 0.38 - i * 0.05));
+  for (const [x, z] of [[L * 0.36, L * 0.36], [L * 0.28, L * 0.42]]) g.add(mesh(rbox(0.7, 0.7, 0.7, 0.05), mat(0x8a5a3c), x, 0.47, z));
+  // cones listrados
+  for (const [x, z] of [[-L * 0.45, L * 0.45], [L * 0.45, -L * 0.45]]) { const c = mesh(new THREE.ConeGeometry(0.25, 0.7, 12), stripeMat, x, 0.47, z); g.add(c); }
+  // guindaste
+  const am = mat(0xffc629, { roughness: 0.4 }), gu = new THREE.Group(); gu.position.set(L * 0.38, 0, -L * 0.38); g.add(gu);
+  gu.add(mesh(new THREE.BoxGeometry(0.35, alt + 2.5, 0.35), am, 0, (alt + 2.5) / 2, 0));
+  const braco = mesh(new THREE.BoxGeometry(L * 0.9, 0.25, 0.25), am, -L * 0.3, alt + 2.4, 0); gu.add(braco);
+  gu.add(mesh(new THREE.CylinderGeometry(0.02, 0.02, 2, 4), darkMat, -L * 0.6, alt + 1.4, 0));
+  const carga = mesh(new THREE.BoxGeometry(0.8, 0.5, 0.8), madeiraObra(), -L * 0.6, alt + 0.2, 0); gu.add(carga);
+  g.userData.guindaste = gu;
+  addPool(g, 0, L * 0.4, 4);
+  return g;
 }
 const ELF_CORES = [0x2e9e5b, 0x3a8fd0, 0xc23b6a, 0xe0902a, 0x8a5cc8, 0x2bb3a6];
 
@@ -1081,6 +1137,7 @@ export async function criarCena(canvas) {
 
   // ---------- estado desenhado ----------
   const predios = new Map();    // id -> { obj, tipo, tam }
+  const construtoresObj = [];
   const elfs = new Map();       // duende id -> { obj, alvo, ... }
   const raiz = new THREE.Group(); scene.add(raiz);
   let vilaAtual = null, praca = null;
@@ -1123,6 +1180,11 @@ export async function criarCena(canvas) {
       elfs.get(d.id).d = d;
     });
     for (const [id, e] of elfs) if (!vivosD.has(id)) { scene.remove(e.obj); liberar(e.obj); elfs.delete(id); }
+    // duendes construtores: um por obra; os livres esperam perto da praça
+    const qtd = vila.construtores || 1;
+    while (construtoresObj.length < qtd) { const o = makeConstrutor(); const c = praca ? centroLote(praca.x, praca.z, 4) : V3(0, 0, 0); o.position.set(c.x - 6 - construtoresObj.length, 0, c.z + 4); scene.add(o); construtoresObj.push({ obj: o, alvo: o.position.clone(), idx: construtoresObj.length }); }
+    const obras = vila.predios.filter(p => p.obra && p.obra.tipo !== 'enfeite' && p.obra.item === undefined);
+    construtoresObj.forEach((b, i) => { b.obra = obras[i] || null; });
   }
 
   // ponto onde o duende trabalha: na frente do prédio, lado a lado
@@ -1316,6 +1378,18 @@ export async function criarCena(canvas) {
       if (f) { f.obj.userData.fogo.children.forEach((c, i) => { if (c.geometry.type === 'ConeGeometry') c.scale.y = 0.85 + Math.sin(t * 9 + i * 2) * 0.15; }); sala.fogoLuz.intensity = (14 + f.n * 6) * (0.85 + Math.sin(t * 11) * 0.1 + Math.sin(t * 17) * 0.05); }
     }
     animarVida(dt, t);
+    for (const b of construtoresObj) {
+      const o = b.obj, u = o.userData;
+      if (b.obra) {
+        const tam = TIPOS[b.obra.tipo].tam, c = centroLote(b.obra.x, b.obra.z, tam);
+        b.alvo.set(c.x + tam * T * 0.42, 0, c.z + tam * T * 0.5 + 0.6);
+      } else if (praca) { const c = centroLote(praca.x, praca.z, 4); b.alvo.set(c.x - 6.2 - b.idx * 1.2, 0, c.z + 4.5); }
+      if (andarAte(o, b.alvo, dt, t, 3.4, b.idx)) {
+        if (b.obra) { const tam = TIPOS[b.obra.tipo].tam, c = centroLote(b.obra.x, b.obra.z, tam); o.rotation.y = Math.atan2(c.x - o.position.x, c.z - o.position.z); u.arms[1].rotation.x = -1.4 - Math.abs(Math.sin(t * 7 + b.idx)) * 1.2; }
+        else { o.rotation.y = 0.4; u.arms.forEach(a => a.rotation.x = 0); }
+      }
+    }
+    for (const e of predios.values()) if (e.obj.userData.guindaste) e.obj.userData.guindaste.rotation.y = Math.sin(t * 0.4) * 0.6;
     for (const fn of ouvintes) fn(dt);
     composer.render();
     requestAnimationFrame(frame);
