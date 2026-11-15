@@ -1155,7 +1155,7 @@ export async function criarCena(canvas) {
   const predios = new Map();    // id -> { obj, tipo, tam }
   // terrenos à venda: área amarela tracejada com placa; somem quando comprados
   const terrenosGrupo = new THREE.Group(); scene.add(terrenosGrupo);
-  const loteVenda = new THREE.MeshBasicMaterial({ color: 0xffc94d, transparent: true, opacity: 0.16, depthWrite: false, toneMapped: false });
+  const loteVenda = new THREE.MeshBasicMaterial({ color: 0xffc94d, transparent: true, opacity: 0.09, depthWrite: false, toneMapped: false });
   const bordaVenda = new THREE.LineDashedMaterial({ color: 0xffd76a, dashSize: 0.9, gapSize: 0.6, toneMapped: false });
   let chaveTerrenos = null;
   function sincTerrenos(vila) {

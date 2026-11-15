@@ -763,7 +763,7 @@ function sincBaloes() {
   // terrenos à venda: mostra os que já dá pra comprar e os do próximo nível
   const nv = nivelDe(estado.alegria);
   for (const t of TERRENOS) {
-    if (!terrenoLivre(estado, t) || t.nivel > nv + 1) continue;
+    if (!terrenoLivre(estado, t) || t.nivel > nv) continue;
     const id = 'T:' + t.id; vivos.add(id);
     let el = baloes.get(id);
     if (!el) {
@@ -877,6 +877,11 @@ function ligarToques(canvas) {
     if (dentro) { const k = cena.itemEm(e.clientX, e.clientY); if (k) focarLinha(k); return; }
     if (visitando) { const pid = cena.predioEm(e.clientX, e.clientY); if (pid) ajudarAmigo(pid); return; }
     const id = cena.predioEm(e.clientX, e.clientY);
+    if (!id) {
+      const l = cena.loteEm(e.clientX, e.clientY);
+      const t = l && TERRENOS.find(t => terrenoLivre(estado, t) && l.x >= t.x && l.x < t.x + t.w && l.z >= t.z && l.z < t.z + t.h);
+      if (t) { abrirTerreno(t.id); return; }
+    }
     if (id) {
       const p = predio(estado, id), pr = p && TIPOS[p.tipo].prod;
       if (pr && prontos(p) >= 1 && painel !== 'predio') coletar(id);
