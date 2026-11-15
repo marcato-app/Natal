@@ -1065,10 +1065,10 @@ export async function criarCena(canvas) {
 
   // céu com aurora e estrelas
   const skyMat = new THREE.ShaderMaterial({
-    side: THREE.BackSide, depthWrite: false, fog: false, uniforms: { uTime: { value: 0 } },
+    side: THREE.BackSide, depthWrite: false, fog: false, uniforms: { uTime: { value: 0 }, uClaro: { value: 0 } },
     vertexShader: `varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
     fragmentShader: `
-      varying vec3 vDir; uniform float uTime;
+      varying vec3 vDir; uniform float uTime; uniform float uClaro;
       float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
       float noise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3.0-2.0*f);
         return mix(mix(hash(i), hash(i+vec2(1,0)), u.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y); }
@@ -1086,10 +1086,10 @@ export async function criarCena(canvas) {
         a *= smoothstep(0.04, 0.2, h);
         vec3 ac = mix(vec3(0.12, 1.0, 0.72), vec3(0.3, 0.75, 1.0), smoothstep(0.22, 0.45, h));
         ac = mix(ac, vec3(0.8, 0.45, 1.0), smoothstep(0.42, 0.62, h) * 0.55);
-        col += ac * a * 0.85;
+        col += ac * a * (0.6 + 0.6 * uClaro);
         vec2 sp = vec2(az * 110.0, h * 150.0); vec2 cell = floor(sp); float s = hash(cell); vec2 f = fract(sp) - 0.5;
         float star = step(0.986, s) * smoothstep(0.14, 0.0, length(f)) * smoothstep(0.1, 0.4, h);
-        col += vec3(star) * (0.7 + 0.3 * sin(uTime * 2.0 + s * 60.0));
+        col += vec3(star) * (0.7 + 0.3 * sin(uTime * 2.0 + s * 60.0)) * (0.35 + 0.65 * uClaro);
         gl_FragColor = vec4(col, 1.0);
       }`,
   });
@@ -1514,6 +1514,18 @@ export async function criarCena(canvas) {
     return urls;
   }
 
+  // ---------- clima ----------
+  // Ciclo de 10 min igual pra todo mundo (pelo relógio): neve forte, parando, céu limpo
+  // (aurora e estrelas mais fortes), começando, neve fraca. Transições suaves.
+  let maxFlocos = flakeN;
+  const CLIMA = [[0, 1], [170, 1], [230, 0], [400, 0], [440, 0.45], [540, 0.45], [600, 1]]; // [segundo do ciclo, intensidade]
+  function intensidadeNeve(ms) {
+    const sec = (ms / 1000) % 600;
+    for (let i = 1; i < CLIMA.length; i++) if (sec <= CLIMA[i][0]) { const [a0, v0] = CLIMA[i - 1], [a1, v1] = CLIMA[i]; const k = THREE.MathUtils.smoothstep(sec, a0, a1); return v0 + (v1 - v0) * k; }
+    return 1;
+  }
+  let neve = 1;
+
   // ---------- qualidade automática ----------
   // 2 = tudo; 1 = sem brilho (bloom) e resolução menor; 0 = também sem sombras e com menos neve.
   // Começa na melhor e desce sozinha se o aparelho não aguentar ~40 quadros por segundo.
@@ -1527,7 +1539,7 @@ export async function criarCena(canvas) {
     moon.castShadow = qualidade >= 1;
     renderer.setPixelRatio(Math.min(devicePixelRatio, [1, 1.25, coarse ? 1.5 : 2][qualidade]));
     composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(innerWidth, innerHeight);
-    flakeGeo.setDrawRange(0, qualidade === 0 ? Math.floor(flakeN / 3) : flakeN);
+    maxFlocos = qualidade === 0 ? Math.floor(flakeN / 3) : flakeN;
     try { localStorage.setItem('natal.qualidade', String(qualidade)); } catch { /* sem armazenamento */ }
   }
   aplicarQualidade(qualidade);
@@ -1554,9 +1566,13 @@ export async function criarCena(canvas) {
     if (ox || oz) { tg.x += ox; tg.z += oz; camera.position.x += ox; camera.position.z += oz; }
     tg.y = 0;
 
+    neve = intensidadeNeve(Date.now());
+    flakeGeo.setDrawRange(0, Math.floor(maxFlocos * neve));
+    scene.fog.density = 0.0052 + 0.0026 * neve;
+    skyMat.uniforms.uClaro.value = 1 - neve;
     const p = flakeGeo.attributes.position.array, sp = reduceMotion ? 0.4 : 1;
     for (let i = 0; i < flakeN; i++) {
-      p[i * 3 + 1] -= dt * 2.2 * fs[i] * sp; p[i * 3] += Math.sin(t * 0.7 + i) * dt * 0.4 * sp;
+      p[i * 3 + 1] -= dt * (1.2 + neve) * fs[i] * sp; p[i * 3] += Math.sin(t * 0.7 + i) * dt * (0.3 + neve * 0.6) * sp;
       if (p[i * 3 + 1] < 0) { p[i * 3 + 1] = 45; p[i * 3] = R(-70, 70) + tg.x; p[i * 3 + 2] = R(-70, 70) + tg.z; }
     }
     flakeGeo.attributes.position.needsUpdate = true;
@@ -1772,7 +1788,7 @@ export async function criarCena(canvas) {
     sincronizar, setFantasma, setDeslocamento, centroTerreno, entrarCasa, sairCasa, sincSala, itemEm, posItem, modo: () => modo, setGrade, setSelecionado, esconder, loteEm, predioEm, projetar, topoDe, focar, miniaturas,
     aoQuadro: fn => ouvintes.push(fn),
     papaiNoel, chamineDe, noelVoando: () => noel.voando,
-    qualidade: () => qualidade, setQualidade: aplicarQualidade,
+    qualidade: () => qualidade, setQualidade: aplicarQualidade, neve: () => neve,
     memoria: () => ({ ...renderer.info.memory }),
     controls,
   };
