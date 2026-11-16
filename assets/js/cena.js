@@ -1882,6 +1882,48 @@ function makeTreno() {
 }
 
 // ---------- cena ----------
+// Lojas e igreja com modelos prontos (Sketchfab, CC BY): o modelo é encaixado no lote e ganha
+// placa com o nome e postes (sem pisca: a fachada de cada modelo tem um formato e a fileira
+// de luz ficaria solta no ar). `giro` acerta a frente (+z) de cada um.
+const PREDIOS_PRONTOS = {
+  confeitaria: { arq: 'confeitaria', giro: 0, placa: 'Confeitaria', alt: 7, semChao: true },
+  loja: { arq: 'loja', giro: 0, placa: 'Brinquedos', alt: 7 },
+  correio: { arq: 'correio', giro: Math.PI, placa: 'Correio do Papai Noel', alt: 6.5 },
+  igreja: { arq: 'igreja', giro: 0, alt: 13, semChao: true },
+};
+function prepararPredio(cena, giro = 0, semChao = false) {
+  cena.rotation.y = giro;
+  const raiz = new THREE.Group(); raiz.add(cena); raiz.updateMatrixWorld(true);
+  if (semChao) { // tira o chão que vem junto (peça chata e larga): o prédio é que tem de caber no lote
+    const tudo = new THREE.Box3().setFromObject(cena), H = tudo.max.y - tudo.min.y, area = (tudo.max.x - tudo.min.x) * (tudo.max.z - tudo.min.z), fora = [];
+    cena.traverse(o => { if (!o.isMesh) return; const b = new THREE.Box3().setFromObject(o), q = b.getSize(V3()); if (q.y < H * 0.08 && q.x * q.z > area * 0.2) fora.push(o); });
+    for (const o of fora) o.parent.remove(o);
+    raiz.updateMatrixWorld(true);
+  }
+  const box = new THREE.Box3().setFromObject(cena), c = box.getCenter(V3());
+  cena.position.set(cena.position.x - c.x, cena.position.y - box.min.y, cena.position.z - c.z); raiz.updateMatrixWorld(true);
+  cena.traverse(o => {
+    if (!o.isMesh) return;
+    o.geometry.userData.compartilhado = true; o.material.userData.compartilhado = true;
+    for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) if (o.material[k]) o.material[k].userData.compartilhado = true;
+    if (/vidro/i.test(o.material.name)) o.material = LUZ_JANELA;
+  });
+  return { cena: raiz, tam: box.getSize(V3()) };
+}
+for (const [tipo, cfg] of Object.entries(PREDIOS_PRONTOS)) carregarPronto('p_' + tipo, `/assets/modelos/${cfg.arq}.glb`, (c) => prepararPredio(c, cfg.giro, cfg.semChao));
+function makePredioPronto(tipo, P) {
+  const cfg = PREDIOS_PRONTOS[tipo], L = TIPOS[tipo].tam * T, g = new THREE.Group();
+  const k = Math.min(L * 0.92 / Math.max(P.tam.x, P.tam.z), cfg.alt / P.tam.y);
+  const m = P.cena.clone(); m.scale.setScalar(k); g.add(m);
+  const w = P.tam.x * k, d = P.tam.z * k, h = P.tam.y * k, fz = d / 2;
+  g.add(caixa(L * 0.98, 0.1, L * 0.98, MR.calcada, 0, 0.05, 0));
+  if (cfg.placa) placa(g, cfg.placa, Math.min(w * 0.7, 4.2), 0, Math.min(h * 0.62, 3.3), fz + 0.15, '#fff4dc', '#9e1f28');
+  for (const x of [-L / 2 + 0.5, L / 2 - 0.5]) { const pj = posteJardim(); pj.position.set(x, 0, L / 2 - 0.4); g.add(pj); }
+  g.userData.altura = h + 1;
+  return g;
+}
+for (const tipo of Object.keys(PREDIOS_PRONTOS)) { const orig = MODELOS[tipo]; MODELOS[tipo] = (p) => PRONTOS['p_' + tipo] ? makePredioPronto(tipo, PRONTOS['p_' + tipo]) : orig(p); }
+
 export async function criarCena(canvas) {
   for (const m of [snowMat, glowMat, frameMat, darkMat, stripeMat, bulbMat, wireMat, poolMat, vidroMat, pneuMat]) m.userData.compartilhado = true;
   bulbGeo.userData.compartilhado = true;

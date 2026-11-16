@@ -87,7 +87,11 @@ então nada vem de CDN; `sw.js` guarda tudo no aparelho pra abrir offline.
   trocar ou acrescentar um modelo: `node scripts/subir-modelos.mjs`. Local e no app eles saem
   da pasta mesmo. Pra trazer outro: baixar do Sketchfab, tirar interior e vidro com
   transmissão, texturas 256–512 em WebP e meshopt (`@gltf-transform`), mirar em < 700 KB.
-- **Igreja** (`igreja`, nível 9, 4×4): o mesmo modelo da igreja do bairro vizinho (`makeIgreja`).
+- **Lojas e igreja prontas** (`PREDIOS_PRONTOS` em `cena.js`): igreja ("Church", drobluda), confeitaria,
+  loja e correio vêm do Sketchfab (CC BY, crédito nos Ajustes), encaixados no lote com placa e postes;
+  `giro` acerta a frente e `semChao` tira o chão que vem no modelo. Padaria, fábrica e as atrações
+  seguem feitas por código.
+- **Igreja** (`igreja`, nível 9, 4×4): enquanto o modelo carrega, usa `makeIgreja` (a do bairro vizinho).
   **Presépio** com Sagrada Família, boi e burrinho, reis magos, pastor e estrela guia.
 - **Luz**: `scene.environment` é um céu noturno pré-calculado (PMREM) pra reflexos; prédio
   iluminado e poste da rua ganham uma mancha de luz quente na neve (`brilhoChao`, aditiva).
