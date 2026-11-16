@@ -89,6 +89,8 @@ então nada vem de CDN; `sw.js` guarda tudo no aparelho pra abrir offline.
   transmissão, texturas 256–512 em WebP e meshopt (`@gltf-transform`), mirar em < 700 KB.
 - **Igreja** (`igreja`, nível 9, 4×4): o mesmo modelo da igreja do bairro vizinho (`makeIgreja`).
   **Presépio** com Sagrada Família, boi e burrinho, reis magos, pastor e estrela guia.
+- **Luz**: `scene.environment` é um céu noturno pré-calculado (PMREM) pra reflexos; prédio
+  iluminado e poste da rua ganham uma mancha de luz quente na neve (`brilhoChao`, aditiva).
 - **Desempenho**: `criarModelo` passa todo prédio por `otimizar()`, que junta as peças paradas
   de material equivalente (o que está no `userData` fica solto pra animar). No celular a sombra é
   refeita a cada 2 quadros e no máximo `MAX_ELFOS` duendes aparecem. Em localhost,

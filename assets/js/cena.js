@@ -445,6 +445,20 @@ function makeHouse(p = {}) {
   return g;
 }
 
+// ---------- luz no chão ----------
+// Mancha quente e suave na neve na frente de prédio iluminado e embaixo de poste: um plano
+// com gradiente radial somado à cena (barato, uma peça por prédio).
+const brilhoTex = tex(128, 128, (g, w, h) => {
+  const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.45, 'rgba(255,255,255,.45)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+});
+brilhoTex.userData.compartilhado = true;
+const BRILHO_CHAO = new THREE.MeshBasicMaterial({ map: brilhoTex, color: 0xff9433, transparent: true, opacity: 0.42, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+BRILHO_CHAO.userData.compartilhado = true;
+const GEO_LUZ_CHAO = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2); GEO_LUZ_CHAO.userData.compartilhado = true;
+function brilhoChao(w, d, x = 0, z = 0) { const m = new THREE.Mesh(GEO_LUZ_CHAO, BRILHO_CHAO); m.scale.set(w, 1, d); m.position.set(x, 0.06, z); m.userData.noShadow = true; m.renderOrder = 2; return m; }
+
 // ---------- modelos 3D prontos (.glb) ----------
 // Carregam em segundo plano; enquanto não chegam, o prédio usa o modelo feito por código.
 // Cada modelo pronto é preparado uma vez (medidas, janelas, beirais, telhado) e depois
@@ -1502,6 +1516,8 @@ function criarModelo(tipo, p) {
     if (p && p.obra && p.obra.tipo === 'melhorar') { const a = makeAndaime(TIPOS[tipo].tam * T * 0.95, (o.userData.altura || 6) - 0.5); o.add(a); }
   }
   o.traverse(m => { if (m.isMesh) { m.castShadow = !m.userData.noShadow; m.receiveShadow = true; } });
+  const t = TIPOS[tipo];
+  if (t && t.cat && t.cat !== 'decoracao' && !(p && p.obra && p.obra.tipo === 'construir')) { const L = t.tam * T; o.add(brilhoChao(L * 1.1, L * 0.55, 0, L * 0.5)); }
   return otimizar(o);
 }
 const chaveModelo = (p) => `${p.tipo}|${p.nv || 1}|${JSON.stringify(p.itens || {})}|${p.obra && p.obra.tipo !== 'enfeite' ? p.obra.tipo : ''}`;
@@ -1920,11 +1936,22 @@ export async function criarCena(canvas) {
   const sky = new THREE.Mesh(new THREE.SphereGeometry(600, 48, 24), skyMat);
   scene.add(sky);
 
-  scene.add(new THREE.HemisphereLight(0x8fb0ff, 0x24336e, 0.95));
+  // ambiente pra reflexos (calculado uma vez): céu noturno com o brilho quente da vila no
+  // horizonte e a lua. Metal, vidro e telhado passam a refletir em vez de parecer plástico.
+  {
+    const pm = new THREE.PMREMGenerator(renderer), env = new THREE.Scene();
+    env.add(new THREE.Mesh(new THREE.SphereGeometry(10, 32, 16), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false,
+      vertexShader: 'varying vec3 vD; void main(){ vD = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'varying vec3 vD; void main(){ float h = normalize(vD).y; vec3 c = mix(vec3(0.07, 0.1, 0.2), vec3(0.01, 0.02, 0.06), smoothstep(0.0, 0.6, h)); if (h < 0.0) c = mix(vec3(0.08, 0.09, 0.13), vec3(0.12, 0.13, 0.17), smoothstep(0.0, -0.4, h)); gl_FragColor = vec4(c, 1.0); }' })));
+    for (let i = 0; i < 9; i++) { const a = i / 9 * Math.PI * 2; const b = new THREE.Mesh(new THREE.SphereGeometry(0.9, 8, 6), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.6, 0.9, 0.35) })); b.position.set(Math.cos(a) * 9, 0.4, Math.sin(a) * 9); env.add(b); }
+    const lua = new THREE.Mesh(new THREE.SphereGeometry(0.8, 12, 8), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.4, 3) })); lua.position.set(-5, 7, 5); env.add(lua);
+    scene.environment = pm.fromScene(env, 0.04).texture; pm.dispose();
+  }
+  scene.add(new THREE.HemisphereLight(0x8fb0ff, 0x24336e, 0.85));
   const moon = new THREE.DirectionalLight(0xb8ccff, 1.25);
   moon.position.set(-30, 50, 35); moon.castShadow = true;
   moon.shadow.mapSize.set(coarse ? 1024 : 2048, coarse ? 1024 : 2048);
-  Object.assign(moon.shadow.camera, { left: -36, right: 36, top: 36, bottom: -36, near: 1, far: 160 });
+  Object.assign(moon.shadow.camera, { left: -46, right: 46, top: 46, bottom: -46, near: 1, far: 170 });
   moon.shadow.bias = -0.0006; moon.shadow.normalBias = 0.04;
   scene.add(moon);
   const treeLight = new THREE.PointLight(0xffc46b, 110, 26, 2); scene.add(treeLight);
@@ -1990,6 +2017,10 @@ export async function criarCena(canvas) {
       postes.add(pp);
     }
     fundir(postes); scene.add(postes);
+    const pts = []; for (let x = -110; x <= 110; x += 12) for (const sd of [-1, 1]) pts.push([x + (sd > 0 ? 6 : 0), RZ + sd * 1.1]);
+    const luzes = new THREE.InstancedMesh(GEO_LUZ_CHAO, BRILHO_CHAO, pts.length), m4 = new THREE.Matrix4();
+    pts.forEach(([x, z], i) => { m4.compose(V3(x, 0.07, z), new THREE.Quaternion(), V3(6, 1, 6)); luzes.setMatrixAt(i, m4); });
+    luzes.renderOrder = 2; scene.add(luzes);
   }
 
   // cerca em volta da vila (com abertura na rua da frente)
