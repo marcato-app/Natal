@@ -874,50 +874,132 @@ function makeBench() {
   return g;
 }
 
-// Árvore da praça: começa só verde (com neve) e ganha os enfeites comprados.
+// Árvore da praça (no estilo de uma árvore de sala de verdade): pinheiro "nevado" (galhos com
+// flocos brancos) que ganha os enfeites comprados — pisca branco quente miudinho, bolas vermelhas,
+// verde-sálvia e brancas, laços de veludo verde com borda dourada, bicos-de-papagaio vermelhos,
+// ursinhos e bengalas doces, borboleta de luz, presentes e a estrela de cristal no topo.
+const ARV = {
+  veludo: new THREE.MeshStandardMaterial({ color: 0xb01a2c, roughness: 0.9, emissive: 0x5a0812 }),
+  veludoVerde: new THREE.MeshStandardMaterial({ color: 0x2c5a40, roughness: 0.9, emissive: 0x0c2416 }),
+  ouro: new THREE.MeshStandardMaterial({ color: 0xe8c66a, metalness: 0.6, roughness: 0.3, emissive: 0x4a3510 }),
+  pelucia: new THREE.MeshStandardMaterial({ color: 0xf3ead8, roughness: 1, emissive: 0x3a3428 }),
+  pelucia2: new THREE.MeshStandardMaterial({ color: 0xc89a62, roughness: 1 }),
+  frutinha: new THREE.MeshStandardMaterial({ color: 0xb3121f, roughness: 0.35, metalness: 0.1 }),
+  luzBorboleta: new THREE.MeshBasicMaterial({ color: new THREE.Color(1.5, 1.45, 1.35), toneMapped: false, side: THREE.DoubleSide, transparent: true, opacity: 0.92 }),
+  cristal: new THREE.MeshBasicMaterial({ color: new THREE.Color(1.7, 1.8, 2.1), toneMapped: false }),
+};
+for (const m of Object.values(ARV)) m.userData.compartilhado = true;
+function bicoDePapagaio() {
+  const g = new THREE.Group(), petala = new THREE.Shape();
+  petala.moveTo(0, 0); petala.quadraticCurveTo(0.22, 0.35, 0, 0.85); petala.quadraticCurveTo(-0.22, 0.35, 0, 0);
+  const geo = new THREE.ExtrudeGeometry(petala, { depth: 0.03, bevelEnabled: false });
+  for (let i = 0; i < 7; i++) { const p = new THREE.Mesh(geo, ARV.veludo); p.rotation.z = i / 7 * Math.PI * 2; p.rotation.x = -0.25; g.add(p); }
+  for (let i = 0; i < 5; i++) g.add(mR(new THREE.SphereGeometry(0.05, 6, 5), ARV.ouro, Math.cos(i * 1.26) * 0.08, Math.sin(i * 1.26) * 0.08, 0.06));
+  return g;
+}
+function lacoVeludo() {
+  const g = new THREE.Group();
+  for (const s of [-1, 1]) {
+    const alca = mR(new THREE.TorusGeometry(0.32, 0.1, 8, 18), ARV.veludoVerde, s * 0.34, 0.05, 0); alca.scale.set(1.2, 0.75, 0.5); g.add(alca);
+    const borda = mR(new THREE.TorusGeometry(0.42, 0.025, 6, 22), ARV.ouro, s * 0.34, 0.05, 0.02); borda.scale.set(1.2, 0.75, 0.5); g.add(borda);
+    const ponta = caixa(0.2, 0.7, 0.05, ARV.veludoVerde, s * 0.18, -0.38, 0); ponta.rotation.z = s * 0.35; g.add(ponta);
+  }
+  g.add(mR(new THREE.SphereGeometry(0.14, 10, 8), ARV.veludoVerde, 0, 0.04, 0.03));
+  return g;
+}
+function ursinho(cor) {
+  const g = new THREE.Group(), c = cor ? ARV.pelucia2 : ARV.pelucia;
+  g.add(mR(new THREE.SphereGeometry(0.3, 12, 10), c, 0, 0.3, 0));
+  g.add(mR(new THREE.SphereGeometry(0.24, 12, 10), c, 0, 0.72, 0.02));
+  for (const s of [-1, 1]) { g.add(mR(new THREE.SphereGeometry(0.09, 8, 6), c, s * 0.17, 0.92, 0)); g.add(mR(new THREE.SphereGeometry(0.11, 8, 6), c, s * 0.26, 0.15, 0.14)); }
+  g.add(mR(new THREE.SphereGeometry(0.1, 8, 6), c, 0, 0.66, 0.2));
+  g.add(mR(new THREE.SphereGeometry(0.04, 6, 5), MR.preto, 0, 0.7, 0.29));
+  for (const s of [-1, 1]) g.add(mR(new THREE.SphereGeometry(0.03, 6, 5), MR.preto, s * 0.08, 0.78, 0.22));
+  const lenco = mR(new THREE.TorusGeometry(0.17, 0.06, 6, 16), ARV.veludo, 0, 0.52, 0.02); lenco.rotation.x = Math.PI / 2; g.add(lenco);
+  return g;
+}
+function bengala() {
+  const g = new THREE.Group(), branco = mat(0xfaf6ef, { roughness: 0.4 });
+  for (let i = 0; i < 5; i++) g.add(mR(new THREE.CylinderGeometry(0.05, 0.05, 0.14, 8), i % 2 ? branco : ARV.frutinha, 0, i * 0.14, 0));
+  g.add(mR(new THREE.TorusGeometry(0.12, 0.05, 6, 12, Math.PI), ARV.frutinha, -0.12, 0.66, 0));
+  return g;
+}
+function borboletaLuz() {
+  const g = new THREE.Group(), asa = new THREE.Shape();
+  asa.moveTo(0, 0); asa.bezierCurveTo(0.5, 0.9, 1.4, 1.0, 1.3, 0.35); asa.bezierCurveTo(1.25, 0.05, 0.6, 0.0, 0.0, 0);
+  asa.bezierCurveTo(0.7, -0.1, 1.0, -0.7, 0.55, -0.85); asa.bezierCurveTo(0.25, -0.9, 0.1, -0.4, 0, 0);
+  const geo = new THREE.ShapeGeometry(asa, 12);
+  for (const s of [-1, 1]) { const a = new THREE.Mesh(geo, ARV.luzBorboleta); a.scale.x = s; a.rotation.y = s * 0.45; a.userData.noShadow = true; g.add(a); }
+  const corpo = mR(new THREE.CapsuleGeometry(0.06, 0.7, 4, 8), ARV.luzBorboleta, 0, -0.05, 0.02); corpo.userData.noShadow = true; g.add(corpo);
+  return g;
+}
+
 function makeTree(it = {}) {
   const g = new THREE.Group();
   g.add(mesh(new THREE.CylinderGeometry(0.5, 0.6, 1.4, 10), mat(0x5a3a26), 0, 0.7, 0));
   const tiers = [];
-  for (let i = 0; i < 5; i++) {
-    const r = 4.3 - i * 0.82, h = 3.3 - i * 0.18, y = 1.1 + i * 1.75 + h / 2;
+  for (let i = 0; i < 6; i++) {
+    const r = 4.3 - i * 0.7, h = 3.0 - i * 0.16, y = 1.1 + i * 1.5 + h / 2;
     tiers.push({ r, h, base: y - h / 2 });
-    g.add(mesh(coneGalhos(r, h, 12, i), mat([0x1a4d36, 0x1e5a3e, 0x226446, 0x266e4c, 0x2b7853][i], { roughness: 0.9 }), 0, y, 0));
-    const ch = h * 0.32; g.add(mesh(new THREE.ConeGeometry(r * 0.32 * 1.05, ch, 14), snowMat, 0, y + h / 2 - ch / 2 + 0.02, 0));
+    g.add(mesh(coneGalhos(r, h, 14, i), mat([0x24543c, 0x285c42, 0x2c6446, 0x2f6a4a, 0x33704e, 0x377652][i], { roughness: 0.92 }), 0, y, 0));
   }
   const radiusAt = y => { let best = 0; for (const t of tiers) if (y >= t.base && y <= t.base + t.h) best = Math.max(best, t.r * (1 - (y - t.base) / t.h)); return best; };
-  const top = tiers[4].base + tiers[4].h;
-  const m4 = new THREE.Matrix4(), col = new THREE.Color();
-  const det = mulberry32(5), Rd = (a, b) => a + (b - a) * det();
-  const nB = [0, 70, 130, 190][it.luzes || 0];
+  const top = tiers[5].base + tiers[5].h;
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), col = new THREE.Color();
+  const det = mulberry32(7), Rd = (a, b) => a + (b - a) * det();
+  const naArvore = (y, a, fora = 0) => { const r = radiusAt(y) + fora; return V3(Math.cos(a) * r, y, Math.sin(a) * r); };
+  const virado = (o, a) => { o.rotation.y = Math.PI / 2 - a; return o; }; // frente (+z) pra fora da árvore
+  // "nevado": tufos brancos espalhados nos galhos (sempre: é o jeito da árvore)
+  const nTufos = 420, tufos = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.2, 0), snowMat, nTufos);
+  for (let i = 0; i < nTufos; i++) { const y = Rd(1.4, top - 0.5), a = Rd(0, Math.PI * 2), p = naArvore(y, a, -0.05); q.setFromEuler(new THREE.Euler(Rd(0, 3), Rd(0, 3), 0)); sc.set(Rd(0.8, 1.6), Rd(0.35, 0.6), Rd(0.8, 1.4)); m4.compose(p, q, sc); tufos.setMatrixAt(i, m4); }
+  tufos.userData.noShadow = true; g.add(tufos);
+  // pisca branco quente, miudinho e espalhado (não em espiral)
+  const nB = [0, 160, 320, 480][it.luzes || 0];
   if (nB) {
-    const bulbs = new THREE.InstancedMesh(bulbGeo, bulbMat, nB);
-    const voltas = 6.5 * nB / 190;
-    for (let i = 0; i < nB; i++) { const t = i / nB, y = 1.3 + t * (top - 1.8), a = t * Math.PI * 2 * Math.max(3, voltas), r = radiusAt(y) + 0.12; m4.makeTranslation(Math.cos(a) * r, y, Math.sin(a) * r); bulbs.setMatrixAt(i, m4); bulbs.setColorAt(i, col.setRGB(...((it.luzes || 0) >= 3 ? BULBS[i % 5] : (i % 3 === 0 ? [5, 3.6, 1.2] : [4.6, 3.0, 1.0])))); }
-    bulbs.userData.noShadow = true; g.add(bulbs);
+    const luzes = new THREE.InstancedMesh(new THREE.SphereGeometry(0.045, 5, 4), bulbMat, nB);
+    for (let i = 0; i < nB; i++) { const t = (i + 0.5) / nB, y = 1.3 + Math.sqrt(t) * 0 + t * (top - 1.6), a = i * 2.39996, p = naArvore(y, a, 0.06); m4.makeTranslation(p.x, p.y, p.z); luzes.setMatrixAt(i, m4); luzes.setColorAt(i, col.setRGB(...(i % 4 ? [1.9, 1.45, 0.8] : [2.2, 1.9, 1.3]))); }
+    luzes.userData.noShadow = true; g.add(luzes);
   }
-  const nO = [0, 16, 32, 46][it.bolas || 0];
+  // bolas: vermelhas (brilho e glitter), verde-sálvia foscas e brancas de neve, de tamanhos variados
+  const nO = [0, 22, 44, 66][it.bolas || 0];
   if (nO) {
-    const orn = new THREE.InstancedMesh(new THREE.SphereGeometry(0.24, 14, 10), new THREE.MeshStandardMaterial({ roughness: 0.18, metalness: 0.55 }), nO);
-    const oc = [0xd8333a, 0xffc94d, 0x4f7fe0, 0xe8e8f0, 0xd8333a];
-    for (let i = 0; i < nO; i++) { const y = Rd(1.6, top - 1.2), a = Rd(0, Math.PI * 2), r = radiusAt(y) + 0.05; m4.makeTranslation(Math.cos(a) * r, y - 0.15, Math.sin(a) * r); orn.setMatrixAt(i, m4); orn.setColorAt(i, col.set(oc[i % 5])); }
-    g.add(orn);
+    const cores = [[0xa8121e, 0.25, 0.3], [0x8fa58a, 0.85, 0.0], [0xf2efe8, 0.95, 0.0], [0xc41a26, 0.5, 0.15], [0x7d9479, 0.9, 0.0]];
+    const bolas = new THREE.InstancedMesh(new THREE.SphereGeometry(0.42, 16, 12), new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0.1, emissive: 0x1a1a1a }), nO);
+    for (let i = 0; i < nO; i++) { const y = 1.6 + ((i * 0.618) % 1) * (top - 2.4), a = i * 2.39996 + 1.1, p = naArvore(y, a, 0.2), s2 = Rd(0.75, 1.4); m4.compose(p, q.identity(), sc.set(s2, s2, s2)); bolas.setMatrixAt(i, m4); bolas.setColorAt(i, col.set(cores[i % cores.length][0])); }
+    g.add(bolas);
   }
-  for (let k = 0; k < (it.festao || 0); k++) {
-    const pts = [];
-    for (let i = 0; i <= 120; i++) { const t = i / 120, y = 1.6 + t * (top - 2.6), a = t * Math.PI * 2 * 4 + k * Math.PI, r = radiusAt(y) + 0.18; pts.push(V3(Math.cos(a) * r, y, Math.sin(a) * r)); }
-    g.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 240, 0.09, 6), new THREE.MeshStandardMaterial({ color: k ? 0xd8333a : 0xffcf5a, metalness: 0.7, roughness: 0.3, emissive: k ? 0x300000 : 0x3a2600 })));
+  // laços de veludo verde com borda dourada (o festão de antes)
+  const nL = [0, 5, 10][it.festao || 0];
+  for (let i = 0; i < nL; i++) { const y = 2.2 + ((i * 0.4142 + 0.2) % 1) * (top - 3.4), a = i * 2.2 + 0.4, l = lacoVeludo(); l.position.copy(naArvore(y, a, 0.4)); virado(l, a); l.scale.setScalar(1.8 - y / top * 0.7); g.add(l); }
+  // bicos-de-papagaio vermelhos de veludo
+  const nF = [0, 5, 10][it.flores || 0];
+  for (let i = 0; i < nF; i++) { const y = 1.9 + ((i * 0.7071 + 0.55) % 1) * (top - 3.0), a = i * 2.39996 + 2.6, f = bicoDePapagaio(); f.position.copy(naArvore(y, a, 0.4)); virado(f, a); f.scale.setScalar(1.9 - y / top * 0.8); g.add(f); }
+  // ursinhos sentados nos galhos, bengalas doces e cachos de frutinhas
+  const nU = [0, 3, 6][it.ursinhos || 0];
+  for (let i = 0; i < nU; i++) { const y = 1.8 + ((i * 0.38 + 0.1) % 1) * (top - 4), a = i * 2.39996 + 0.2, u = ursinho(i % 3 === 2); u.position.copy(naArvore(y, a, 0.3)); u.position.y -= 0.35; virado(u, a); u.scale.setScalar(1.5); g.add(u); }
+  for (let i = 0; i < nU * 2; i++) { const y = 1.6 + ((i * 0.53 + 0.3) % 1) * (top - 2.8), a = i * 1.9 + 3.3, b = bengala(); b.position.copy(naArvore(y, a, 0.3)); virado(b, a); b.rotation.z = 0.25; b.scale.setScalar(1.4); g.add(b); }
+  if (nU) {
+    const nF2 = nU * 6, fr = new THREE.InstancedMesh(new THREE.SphereGeometry(0.08, 7, 5), ARV.frutinha, nF2);
+    for (let i = 0; i < nF2; i++) { const k = Math.floor(i / 3), y = 1.7 + ((k * 0.61 + 0.45) % 1) * (top - 2.4), a = k * 2.7 + 0.9, p = naArvore(y, a, 0.12); m4.makeTranslation(p.x + (i % 3 - 1) * 0.1, p.y + (i % 2) * 0.1, p.z); fr.setMatrixAt(i, m4); }
+    g.add(fr);
   }
+  // borboleta de luz branca
+  if (it.borboleta) { const a = 0.9, b = borboletaLuz(), y = top * 0.45; b.position.copy(naArvore(y, a, 0.5)); virado(b, a); b.scale.setScalar(1.3); g.add(b); g.userData.borboleta = b; }
+  // estrela de cristal branca no topo, com frutinhas e um laço embaixo
   if (it.estrela) {
-    const st = new THREE.Shape();
-    for (let i = 0; i < 10; i++) { const a = Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 0.42 : 1.0; i ? st.lineTo(Math.cos(a) * r, Math.sin(a) * r) : st.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
-    const starGeo = new THREE.ExtrudeGeometry(st, { depth: 0.25, bevelEnabled: true, bevelThickness: 0.08, bevelSize: 0.06, bevelSegments: 2 }); starGeo.center();
-    const star = mesh(starGeo, new THREE.MeshStandardMaterial({ color: 0xffd76a, emissive: 0xffb830, emissiveIntensity: 3, metalness: 0.4, roughness: 0.3 }), 0, top + 0.55, 0);
+    const st = new THREE.Shape(), furo = new THREE.Path();
+    for (let i = 0; i < 10; i++) { const a = Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 0.45 : 1.05; i ? st.lineTo(Math.cos(a) * r, Math.sin(a) * r) : st.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+    for (let i = 0; i < 10; i++) { const a = Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 0.3 : 0.75; i ? furo.lineTo(Math.cos(a) * r, Math.sin(a) * r) : furo.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+    st.holes.push(furo);
+    const geo = new THREE.ExtrudeGeometry(st, { depth: 0.12, bevelEnabled: true, bevelThickness: 0.04, bevelSize: 0.04, bevelSegments: 1 }); geo.center();
+    const star = mesh(geo, ARV.cristal, 0, top + 0.75, 0); star.userData.noShadow = true;
+    const dentro = mesh(new THREE.CircleGeometry(0.45, 20), new THREE.MeshBasicMaterial({ color: new THREE.Color(1.4, 1.6, 2), toneMapped: false, transparent: true, opacity: 0.5, side: THREE.DoubleSide }), 0, 0, 0); star.add(dentro);
     g.add(star); g.userData.star = star;
+    const l = lacoVeludo(); l.position.set(0, top - 0.2, radiusAt(top - 0.6) + 0.25); l.scale.setScalar(1.1); g.add(l);
   } else {
-    g.add(mesh(new THREE.ConeGeometry(0.12, 0.6, 8), mat(0x2b7853), 0, top + 0.2, 0));
+    g.add(mesh(new THREE.ConeGeometry(0.12, 0.6, 8), mat(0x377652), 0, top + 0.2, 0));
   }
-  const gc = [[0xd8333a, 0xffd166], [0x2f9e5b, 0xffffff], [0x4f7fe0, 0xffd166], [0xf2a93b, 0xd8333a], [0xe8e8f0, 0xd8333a], [0x9b59d0, 0xffd166], [0xd8333a, 0xffffff], [0x2f9e5b, 0xffd166], [0xffc94d, 0xd8333a]];
+  const gc = [[0xa8121e, 0xd9b45a], [0x1d3b2a, 0xd9b45a], [0xf2efe8, 0xa8121e], [0x8fa58a, 0xffffff], [0xa8121e, 0xffffff], [0xf2efe8, 0x1d3b2a], [0x1d3b2a, 0xa8121e], [0x8fa58a, 0xd9b45a], [0xa8121e, 0xd9b45a]];
   const nG = [0, 3, 6, 9][it.presentes || 0];
   for (let i = 0; i < nG; i++) { const [c, r] = gc[i], a = i / 9 * Math.PI * 2 + 0.3, gf = makeGift(Rd(0.6, 1.1), c, r); gf.position.set(Math.cos(a) * 4.6, 0.08, Math.sin(a) * 4.6); gf.rotation.y = Rd(0, 2); g.add(gf); }
   return g;
@@ -931,7 +1013,7 @@ function makePlaza(p = {}) {
   g.userData.star = tree.userData.star;
   for (const [x, z, r] of [[-3.6, -3.6, Math.PI / 4], [3.6, -3.6, -Math.PI / 4]]) { const b = makeBench(); b.position.set(x, 0, z); b.rotation.y = r + Math.PI; b.scale.setScalar(0.8); g.add(b); }
   const it = p.itens || {};
-  g.userData.brilho = (it.luzes || 0) * 35 + (it.estrela ? 45 : 0) + (it.festao || 0) * 8;
+  g.userData.brilho = (it.luzes || 0) * 35 + (it.estrela ? 45 : 0) + (it.borboleta ? 25 : 0);
   g.userData.altura = 9;
   return g;
 }

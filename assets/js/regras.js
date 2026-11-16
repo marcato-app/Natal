@@ -104,7 +104,7 @@ export const MISSOES = [
   { id: 'nivel15', texto: 'Chegue ao nível 15 da vila', meta: 15, progresso: v => nivelDe(v.alegria), premio: { estrelas: 25 } },
   { id: 'castelo', texto: 'Construa o Castelo de Gelo', meta: 1, progresso: v => v.predios.filter(p => p.tipo === 'castelo' && !p.obra).length, premio: { estrelas: 25 }, foco: 'construir' },
   { id: 'oficina', texto: 'Construa a Oficina do Papai Noel', meta: 1, progresso: v => v.predios.filter(p => p.tipo === 'oficina' && !p.obra).length, premio: { estrelas: 50 }, foco: 'construir' },
-  { id: 'arvore', texto: 'Complete todos os enfeites da árvore', meta: 12, progresso: v => somaItens(v, 'praca', 'arvore'), premio: { estrelas: 20 }, foco: 'praca' },
+  { id: 'arvore', texto: 'Complete todos os enfeites da árvore', meta: 17, progresso: v => somaItens(v, 'praca', 'arvore'), premio: { estrelas: 20 }, foco: 'praca' },
 ];
 // As 3 primeiras missões ainda não resgatadas.
 export function missoesAtivas(v) {
@@ -277,11 +277,14 @@ const PISCA_PINHEIRO = { luzes: { nome: 'Pisca-pisca', grupo: 'pisca', custos: [
 export const ITENS = {
   pinheiro: PISCA_PINHEIRO, abeto: PISCA_PINHEIRO, espruce: PISCA_PINHEIRO,
   praca: {
-    luzes: { nome: 'Pisca-pisca', grupo: 'arvore', custos: [{ moedas: 20 }, { moedas: 60 }, { moedas: 150 }], alegria: [3, 5, 8] },
-    bolas: { nome: 'Bolas coloridas', grupo: 'arvore', custos: [{ moedas: 30 }, { moedas: 80 }, { moedas: 180, doces: 10 }], alegria: [3, 6, 9] },
-    festao: { nome: 'Festão dourado', grupo: 'arvore', custos: [{ moedas: 50 }, { moedas: 140, doces: 15 }], alegria: [4, 8] },
+    luzes: { nome: 'Pisca-pisca branco quente', grupo: 'arvore', custos: [{ moedas: 20 }, { moedas: 60 }, { moedas: 150 }], alegria: [3, 5, 8] },
+    bolas: { nome: 'Bolas vermelhas, verdes e brancas', grupo: 'arvore', custos: [{ moedas: 30 }, { moedas: 80 }, { moedas: 180, doces: 10 }], alegria: [3, 6, 9] },
+    festao: { nome: 'Laços de veludo', grupo: 'arvore', custos: [{ moedas: 50 }, { moedas: 140, doces: 15 }], alegria: [4, 8] },
+    flores: { nome: 'Bicos-de-papagaio', grupo: 'arvore', custos: [{ moedas: 80 }, { moedas: 200, doces: 20 }], alegria: [5, 9] },
+    ursinhos: { nome: 'Ursinhos e bengalas doces', grupo: 'arvore', custos: [{ moedas: 60, doces: 10 }, { moedas: 160, doces: 25 }], alegria: [4, 8] },
     presentes: { nome: 'Presentes embaixo', grupo: 'arvore', custos: [{ moedas: 40, doces: 5 }, { moedas: 100, doces: 15 }, { moedas: 220, doces: 30 }], alegria: [4, 7, 10] },
-    estrela: { nome: 'Estrela no topo', grupo: 'arvore', custos: [{ moedas: 120, doces: 20 }], alegria: [15], precisa: 'luzes' },
+    borboleta: { nome: 'Borboleta de luz', grupo: 'arvore', custos: [{ moedas: 250, doces: 40 }], alegria: [18], precisa: 'luzes' },
+    estrela: { nome: 'Estrela de cristal no topo', grupo: 'arvore', custos: [{ moedas: 120, doces: 20 }], alegria: [15], precisa: 'luzes' },
   },
   casa: {
     pisca: { nome: 'Pisca-pisca no telhado', grupo: 'fachada', custos: [{ moedas: 25 }, { moedas: 70 }], alegria: [2, 4] },

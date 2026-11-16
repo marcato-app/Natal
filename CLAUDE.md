@@ -29,7 +29,10 @@ então nada vem de CDN; `sw.js` guarda tudo no aparelho pra abrir offline.
 
 ### Coisas de Natal
 
-- **Árvore da praça** começa só verde. Comprar um enfeite (`ITENS.praca`) abre uma
+- **Árvore da praça** (`makeTree`): pinheiro nevado no estilo de árvore de sala (pisca branco
+  quente miúdo, bolas vermelhas/verde-sálvia/brancas, laços de veludo verde com borda dourada
+  — a chave `festao` —, bicos-de-papagaio, ursinhos e bengalas, borboleta de luz, estrela de
+  cristal). Começa sem enfeite. Comprar um enfeite (`ITENS.praca`) abre uma
   "obra" (`praca.obra = { item, fim }`): os moradores vão até a árvore (um sobe na
   escada, os outros levam caixas) e o enfeite aparece quando o tempo acaba
   (`TEMPO_ENFEITE`). Um enfeite por vez.
