@@ -11,6 +11,9 @@ export const EXPANSAO = 6;          // terrenos à venda: blocos de 6 x 6 em vol
 export const MAPA_MIN = -EXPANSAO, MAPA_MAX = TAMANHO + EXPANSAO;   // mapa completo: -6..23
 export const ESTOQUE_MAX = 4;       // quantos ciclos de produção um prédio guarda
 export const MAX_ACOES = 50;        // por requisição
+// O trem passa na avenida de trás (linha MAPA_MIN). Estação encostada nele produz mais.
+export const BONUS_TRILHO = 1.5;
+export const pertoDoTrilho = (p) => p.tipo === 'estacao' && p.z === MAPA_MIN + 1;
 
 // Ruas fixas do mapa (em lotes). Não dá pra construir em cima. A rua principal
 // atravessa também os terrenos de expansão.
@@ -479,7 +482,7 @@ export function avancar(v, agora) {
     if (!pr) continue;
     const n = Math.min(duendesEm(v, p.id), pr.vagas);
     if (!n) continue;
-    p.prog = Math.min(ESTOQUE_MAX, (p.prog || 0) + dt * (n / pr.vagas) / pr.ciclo);
+    p.prog = Math.min(ESTOQUE_MAX, (p.prog || 0) + dt * (n / pr.vagas) * (pertoDoTrilho(p) ? BONUS_TRILHO : 1) / pr.ciclo);
   }
   v.t = agora;
   garantirPedidos(v, agora);

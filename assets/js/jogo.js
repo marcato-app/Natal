@@ -11,7 +11,7 @@ import {
   presenteDeHoje, missoesAtivas, PRESENTE_DIARIO, ADVENTO, diaDe,
   emConstrucao, obrasDeConstrutor, construtores, custoAcelerar, TEMPO_ENFEITE, CUSTO_CONSTRUTOR, MAX_CONSTRUTORES, ESTRELAS_POR_NIVEL,
   nivelDe, progressoNivel, alegriaAoConstruir,
-  pedidoChegou, eventoAtual, meuEvento, TRILHA, PONTOS, COLECAO, qtdPeca, serieCompleta,
+  pedidoChegou, eventoAtual, meuEvento, pertoDoTrilho, TRILHA, PONTOS, COLECAO, qtdPeca, serieCompleta,
 } from './regras.js';
 import { criarCena } from './cena.js';
 import * as som from './audio.js';
@@ -325,6 +325,7 @@ function desenharPredio() {
     corpo += `<div class="prod">
       <div class="row"><b>${cheio ? 'Estoque cheio, colete!' : n ? `Próxima entrega: +${pr.qtd} ${NOME_RECURSO[pr.recurso]}` : 'Parado: sem duendes'}</b><span class="timer" id="pd-timer">${cheio || !n ? '' : tempoTexto(falta)}</span></div>
       <div class="bar"><i id="pd-bar" style="width:${cheio ? 100 : frac * 100}%"></i></div>
+      ${p.tipo === 'estacao' ? `<p class="info">${pertoDoTrilho(p) ? '🚂 Encostada no trilho: o trem para aqui e ela produz 50% a mais.' : 'Dica: construída encostada no trilho (no fundo da vila), o trem para nela e ela produz 50% a mais.'}</p>` : ''}
       <div class="row"><span class="sub">${n ? `${n} de ${pr.vagas} duendes · ${Math.round(n / pr.vagas * 100)}% da velocidade` : 'Coloque um duende pra começar'}</span>
       <span class="stock" aria-label="${k} de ${ESTOQUE_MAX} prontos">${Array.from({ length: ESTOQUE_MAX }, (_, i) => `<i class="${i < k ? 'on' : ''}">${i < k ? svg(ICONE[pr.recurso]) : ''}</i>`).join('')}</span></div>
     </div>`;
@@ -1113,6 +1114,7 @@ async function iniciar() {
   };
   setTimeout(chamarNoel, 6000);
   setInterval(chamarNoel, 18000);
+  cena.aoTrem((ev) => { if (ev === 'chegou' && !document.hidden) som.tocar('apito'); });
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { enviar(); agendarAvisos(); } else cancelarAvisos(); });
 }
 // atalho pros testes automáticos (só no servidor local)

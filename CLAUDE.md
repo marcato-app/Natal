@@ -46,8 +46,12 @@ então nada vem de CDN; `sw.js` guarda tudo no aparelho pra abrir offline.
   volta com o saco de moedas e decola pra próxima. Sem casa pronta,
   ele só passeia de vez em quando.
 - **Vida na vila** (só visual, em `cena.js`): carros na rua principal, que segue pela
-  floresta; trem a vapor com vagões de presentes no trilho atrás da vila; moradores
-  passeando.
+  floresta; moradores passeando.
+- **Trem**: o trilho passa dentro da vila, na avenida de trás (linha `MAPA_MIN`, onde não se
+  constrói). Locomotiva a vapor e 3 vagões (modelos prontos) param na plataforma fixa atrás
+  da vila, apitam (`cena.aoTrem` → `som.tocar('apito')`) e passageiros descem. Se o jogador
+  constrói a Estação encostada no trilho (`pertoDoTrilho`: `z === MAPA_MIN + 1`), o trem para
+  nela e ela produz `BONUS_TRILHO` (×1,5). A Estação usa o modelo "Milwaukee Road Depot".
 
 ### Mapa, cidade e visual
 

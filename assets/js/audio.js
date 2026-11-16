@@ -89,6 +89,10 @@ const EFEITOS = {
   nivel(t) { [NOTA.C5, NOTA.E5, NOTA.G5, NOTA.C6, NOTA.E6].forEach((f, i) => sino(f, t + i * 0.09, 1.1, 0.25, efeitosG)); },
   presente(t) { for (let i = 0; i < 10; i++) ruido(t + i * 0.06, 0.05, 0.25, 'highpass', 6000, efeitosG); EFEITOS.nivel(t + 0.4); },
   guizos(t) { for (let i = 0; i < 16; i++) ruido(t + i * 0.07 + (i % 2) * 0.02, 0.05, 0.18, 'highpass', 7000, efeitosG); },
+  apito(t) { // apito de trem a vapor: acorde com vibrato, duas vezes
+    for (const [ini, dur] of [[0, 0.55], [0.7, 0.9]]) for (const f of [440, 554, 659]) tom(f, t + ini, dur, 0.05, 'sawtooth', efeitosG);
+    ruido(t, 1.6, 0.06, 'bandpass', 1800, efeitosG);
+  },
   erro(t) { tom(220, t, 0.18, 0.12, 'triangle', efeitosG); tom(180, t + 0.12, 0.2, 0.12, 'triangle', efeitosG); },
 };
 export function tocar(nome) {

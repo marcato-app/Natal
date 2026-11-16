@@ -2,7 +2,7 @@
 //
 //   node test/regras.test.mjs
 
-import { NIVEIS, vagasPedidos, PEDIDO_ESPERA, PEDIDO_TROCA, eventoAtual, meuEvento, TRILHA, PONTOS, COLECAO, serieCompleta, qtdPeca, EVENTOS,
+import { NIVEIS, BONUS_TRILHO, MAPA_MIN, vagasPedidos, PEDIDO_ESPERA, PEDIDO_TROCA, eventoAtual, meuEvento, TRILHA, PONTOS, COLECAO, serieCompleta, qtdPeca, EVENTOS,
   TERRENOS, naVila, ANUNCIOS_POR_DIA, ANUNCIO_ADIANTA, anunciosHoje, presenteDeHoje, missoesAtivas, MISSOES, ADVENTO, ganharAlegria, ITENS, bloqueioItem, aluguelDe, TEMPO_ENFEITE, ALUGUEL_CICLO, novaVila, aplicar, avancar, cabe, moradia, prontos, nivelDe, TIPOS, ESTOQUE_MAX, CUSTO_DUENDE,
 } from '../assets/js/regras.js';
 
@@ -341,6 +341,15 @@ check('ação vazia falha', !aplicar(novaVila(T0), null, T0).ok);
   const tema = eventoAtual(t);
   const r = aplicar(w, { tipo: 'presente' }, t + 2);
   check('presente diário dá pontos', r.ok && r.pontos === PONTOS.presente * (tema.dobro === 'presente' ? 2 : 1));
+}
+
+// estação encostada no trilho produz mais
+{
+  const mk = (z) => { const v = novaVila(T0); v.terrenos = TERRENOS.map(t => t.id); v.predios.push({ id: 'e1', tipo: 'estacao', x: 0, z, r: 0, prog: 0 }); v.duendes.push(...[1, 2, 3].map(i => ({ id: 'de' + i, nome: 'X', predio: 'e1' }))); return v; };
+  const perto = mk(MAPA_MIN + 1), longe = mk(2);
+  avancar(perto, seg(300)); avancar(longe, seg(300));
+  const pe = perto.predios.find(p => p.id === 'e1').prog, le = longe.predios.find(p => p.id === 'e1').prog;
+  check('estação no trilho produz 50% a mais', Math.abs(pe / le - BONUS_TRILHO) < 1e-9, { pe, le });
 }
 
 // coleção

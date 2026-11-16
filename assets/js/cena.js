@@ -546,8 +546,8 @@ function prepararCasa(cena, opcoes = {}) {
   const ray = new THREE.Raycaster(), alvos = telhados;
   let chamine = null, chamineTopo = null;
   if (opcoes.chamineDoModelo) { // topo da chaminé que já vem no modelo
-    const pts = outras.flatMap(o => posicoesEm(raiz, o)), ys = []; for (let i = 1; i < pts.length; i += 3) ys.push(pts[i]);
-    const topo = Math.max(...ys), sel = []; for (let i = 0; i < pts.length; i += 3) if (pts[i + 1] > topo - 0.15) sel.push([pts[i], pts[i + 2]]);
+    const pts = outras.flatMap(o => posicoesEm(raiz, o)); let topo = -Infinity; for (let i = 1; i < pts.length; i += 3) if (pts[i] > topo) topo = pts[i];
+    const sel = []; for (let i = 0; i < pts.length; i += 3) if (pts[i + 1] > topo - 0.15) sel.push([pts[i], pts[i + 2]]);
     if (sel.length) chamineTopo = V3(sel.reduce((a, q) => a + q[0], 0) / sel.length, topo, sel.reduce((a, q) => a + q[1], 0) / sel.length);
   }
   for (let x = -tam.x * 0.3; x <= tam.x * 0.1 && alvos.length && !chamineTopo; x += tam.x * 0.05) for (let z = -tam.z * 0.35; z <= 0; z += tam.z * 0.05) {
@@ -560,6 +560,39 @@ function prepararCasa(cena, opcoes = {}) {
   }
   return { cena, tam, neveGeo, beirais, janelas: frente.map(x => x.box), porta: porta && porta.box, chamine, chamineTopo, garagem: !!opcoes.garagem };
 }
+// Veículo pronto (trem): eixo comprido em x, centrado, no chão; vidro vira janela acesa.
+// Na locomotiva, a chaminé é o ponto mais alto da metade da frente (+x).
+function prepararVeiculo(cena) {
+  const raiz = new THREE.Group(); raiz.add(cena); raiz.updateMatrixWorld(true);
+  let box = new THREE.Box3().setFromObject(cena);
+  if (box.max.z - box.min.z > box.max.x - box.min.x) { cena.rotation.y = Math.PI / 2; raiz.updateMatrixWorld(true); box = new THREE.Box3().setFromObject(cena); }
+  const c = box.getCenter(V3()); cena.position.set(cena.position.x - c.x, cena.position.y - box.min.y, cena.position.z - c.z); raiz.updateMatrixWorld(true);
+  const tam = box.getSize(V3()), pts = [];
+  cena.traverse(o => {
+    if (!o.isMesh) return;
+    o.geometry.userData.compartilhado = true; o.material.userData.compartilhado = true;
+    for (const k of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'emissiveMap']) if (o.material[k]) o.material[k].userData.compartilhado = true;
+    if (/vidro/i.test(o.material.name)) o.material = LUZ_JANELA;
+    for (const v of posicoesEm(raiz, o)) pts.push(v);
+  });
+  let chamine = V3(tam.x * 0.35, tam.y, 0), topo = -Infinity;
+  for (let i = 0; i < pts.length; i += 3) if (pts[i] > tam.x * 0.1 && pts[i + 1] > topo) { topo = pts[i + 1]; chamine = V3(pts[i], pts[i + 1], pts[i + 2]); }
+  return { cena: raiz, tam, chamine };
+}
+carregarPronto('locomotiva', '/assets/modelos/locomotiva.glb', prepararVeiculo);
+carregarPronto('vagao', '/assets/modelos/vagao.glb', prepararVeiculo);
+carregarPronto('estacao', '/assets/modelos/estacao.glb', prepararVeiculo);
+// Estação de Trem do jogador com o prédio pronto (Milwaukee Road Depot, hamma085, CC BY 4.0)
+function makeEstacaoPronta(P) {
+  const g = new THREE.Group(), k = Math.min(9.4 / Math.max(P.tam.x, P.tam.z), 11 / P.tam.y);
+  const m = P.cena.clone(); m.scale.setScalar(k); g.add(m);
+  g.add(caixa(9.8, 0.12, 9.8, MR.pedra, 0, 0.06, 0));
+  ledsLinha(g, V3(-P.tam.x * k / 2, 2.2, P.tam.z * k / 2 + 0.1), V3(P.tam.x * k / 2, 2.2, P.tam.z * k / 2 + 0.1), 40, ledQuente);
+  for (const x of [-4.2, 4.2]) { const pj = posteJardim(); pj.position.set(x, 0, 4.6); g.add(pj); }
+  g.userData.altura = P.tam.y * k + 1;
+  return g;
+}
+
 // casas prontas por nível (sorteadas pelo id do prédio)
 const CASAS_PRONTAS = { 1: ['casa1a', 'casa1b', 'casa1c'], 2: ['casa2a', 'casa2b'], 3: ['casa3'] };
 carregarPronto('casa3', '/assets/modelos/casa3.glb', (c) => prepararCasa(c, { garagem: true }));
@@ -1454,7 +1487,7 @@ function makeGloboNeve() {
 
 export const MODELOS = {
   praca: makePlaza, casa: (p) => { const P = casaPronta(p); return P ? makeCasaPronta(p, P) : makeHouse(p); }, fabrica: makeFactory, padaria: makePadariaReal, rinque: makeRinqueReal,
-  correio: makeCorreio, confeitaria: makeConfeitaria, loja: makeLoja, estacao: makeEstacao, mercado: makeMercado, renas: makeRenas,
+  correio: makeCorreio, confeitaria: makeConfeitaria, loja: makeLoja, estacao: () => PRONTOS.estacao ? makeEstacaoPronta(PRONTOS.estacao) : makeEstacao(), mercado: makeMercado, renas: makeRenas,
   pista: makePista, presepio: makePresepio, igreja: makeIgreja,
   casaBiscoito: makeCasaBiscoito, tunelLuzes: makeTunelLuzes, presenteGigante: makePresenteGigante, globoNeve: makeGloboNeve, roda: makeRoda, chafariz: makeChafariz, teatro: makeTeatro, arvoreGigante: makeArvoreGigante,
   castelo: makeCastelo, arco: makeArco, pousada: makePousada, estatua: makeEstatua, oficina: makeOficina,
@@ -1899,7 +1932,7 @@ export async function criarCena(canvas) {
   // terreno: plano no meio (a vila), morros em volta
   const borda = (MAPA_MAX - MEIO) * T; // mapa completo, com os terrenos de expansão
   // a rua principal atravessa a vila e segue pela floresta; o trem passa lá no fundo
-  const RUA_Z = centroLote(0, RUAS[0].z, 1).z, TRILHO_Z = -(MAPA_MAX - MEIO) * T - 10, TRILHO_Y = 0.4;
+  const RUA_Z = centroLote(0, RUAS[0].z, 1).z, TRILHO_Z = centroLote(0, MAPA_MIN, 1).z, TRILHO_Y = 0;
   const hAt = (x, z) => {
     const d = Math.max(Math.abs(x), Math.abs(z)), S = THREE.MathUtils.smoothstep, dr = Math.hypot(x, z);
     const hill = S(dr, borda * 1.45, borda * 1.45 + 80) * 20 * (0.7 + 0.3 * Math.sin(x * 0.05 + z * 0.04));
@@ -1925,6 +1958,11 @@ export async function criarCena(canvas) {
   // ruas
   const calcadas = new THREE.Group();
   RUAS.forEach((r, i) => {
+    if (r.z === MAPA_MIN && r.w > r.h) { // avenida de trás: leito de pedra do trem
+      const lastro = new THREE.Mesh(new THREE.PlaneGeometry(440, T * 0.95), new THREE.MeshStandardMaterial({ color: 0x6f6a66, roughness: 1 }));
+      lastro.rotation.x = -Math.PI / 2; lastro.position.set(0, 0.025, TRILHO_Z); lastro.receiveShadow = true; scene.add(lastro);
+      return;
+    }
     const w = r.w * T, h = r.h * T, c = centroLote(r.x, r.z, 1).add(V3((r.w - 1) * T / 2, 0, (r.h - 1) * T / 2));
     const alongX = r.w >= r.h, wid = (alongX ? h : w) * 0.72;
     let len = alongX ? w : h;
@@ -1957,14 +1995,14 @@ export async function criarCena(canvas) {
   // cerca em volta da vila (com abertura na rua da frente)
   {
     const wm = mat(0x4a3324, { roughness: 0.9 }), posts = [], step = 2.5, e = borda + 1.2;
-    for (let s = -e; s <= e + 0.01; s += step) { posts.push([s, -e]); if (Math.abs(s - RUA_Z) > 3) posts.push([-e, s], [e, s]); if (Math.abs(s) > 3) posts.push([s, e]); }
+    for (let s = -e; s <= e + 0.01; s += step) { if (Math.abs(s - RUA_Z) > 3 && s > TRILHO_Z + 2.4) posts.push([-e, s], [e, s]); if (Math.abs(s) > 3) posts.push([s, e]); }
     const pGeo = rbox(0.28, 1.5, 0.28, 0.05), cGeo = rbox(0.38, 0.2, 0.38, 0.09);
     const ip = new THREE.InstancedMesh(pGeo, wm, posts.length), ic = new THREE.InstancedMesh(cGeo, snowMat, posts.length), m4 = new THREE.Matrix4();
     posts.forEach(([x, z], i) => { m4.makeTranslation(x, 0.75, z); ip.setMatrixAt(i, m4); m4.makeTranslation(x, 1.58, z); ic.setMatrixAt(i, m4); });
     ip.castShadow = true; scene.add(ip, ic);
     const rail = (x1, z1, x2, z2) => { const len = Math.hypot(x2 - x1, z2 - z1); for (const [y, mm, hh] of [[1.15, wm, 0.18], [0.6, wm, 0.18], [1.28, snowMat, 0.1]]) { const r = mesh(rbox(len, hh, 0.14, 0.04), mm, (x1 + x2) / 2, y, (z1 + z2) / 2); r.rotation.y = -Math.atan2(z2 - z1, x2 - x1); scene.add(r); } };
-    rail(-e, -e, e, -e); rail(-e, e, -3.5, e); rail(3.5, e, e, e);
-    for (const x of [-e, e]) { rail(x, -e, x, RUA_Z - 3.2); rail(x, RUA_Z + 3.2, x, e); }
+    rail(-e, e, -3.5, e); rail(3.5, e, e, e);
+    for (const x of [-e, e]) { rail(x, TRILHO_Z + 2.4, x, RUA_Z - 3.2); rail(x, RUA_Z + 3.2, x, e); }
   }
 
   // floresta (instanciada)
@@ -1973,7 +2011,7 @@ export async function criarCena(canvas) {
     while (pts.length < (coarse ? 380 : 620)) {
       const a = R(0, Math.PI * 2), d = R(borda + 6, 150), x = Math.cos(a) * d, z = Math.sin(a) * d;
       if (Math.max(Math.abs(x), Math.abs(z)) < borda + 5) continue;
-      if (Math.abs(z - RUA_Z) < 6.5 || (z > TRILHO_Z - 7.5 && z < -borda - 3)) continue;
+      if (Math.abs(z - RUA_Z) < 6.5 || Math.abs(z - TRILHO_Z) < 5 || (z < TRILHO_Z && z > TRILHO_Z - 16 && Math.abs(x) < 22)) continue;
       if (Math.abs(z - RUA_Z) < 17 && Math.abs(x) > borda + 6 && Math.abs(x) < borda + 82) continue; // bairro vizinho
       if (z > borda && Math.abs(x) < 6 && d < 55) continue;
       if (Math.abs(Math.atan2(z, x) - 0.86) < 0.55 && d < 65) continue;
@@ -2015,15 +2053,45 @@ export async function criarCena(canvas) {
     scene.add(ig);
   }
 
-  // trilho e trem
+  // trilho, estação de trem fixa (atrás da vila) e o trem
   {
-    const trilhoM = mat(0x6a7080, { metalness: 0.6, roughness: 0.4 });
-    for (const dz of [-0.75, 0.75]) scene.add(mesh(new THREE.BoxGeometry(420, 0.12, 0.12), trilhoM, 0, TRILHO_Y + 0.28, TRILHO_Z + dz));
-    const n = 280, dorm = new THREE.InstancedMesh(new THREE.BoxGeometry(0.4, 0.16, 2.2), mat(0x4a3324, { roughness: 0.9 }), n), m4 = new THREE.Matrix4();
-    for (let i = 0; i < n; i++) { m4.makeTranslation(-210 + i * 1.5, TRILHO_Y + 0.15, TRILHO_Z); dorm.setMatrixAt(i, m4); }
+    const trilhoM = mat(0x8a909c, { metalness: 0.7, roughness: 0.35 });
+    for (const dz of [-0.72, 0.72]) scene.add(mesh(new THREE.BoxGeometry(440, 0.1, 0.1), trilhoM, 0, TRILHO_Y + 0.2, TRILHO_Z + dz));
+    const n = 300, dorm = new THREE.InstancedMesh(new THREE.BoxGeometry(0.34, 0.12, 2.1), mat(0x4a3324, { roughness: 0.95 }), n), m4 = new THREE.Matrix4();
+    for (let i = 0; i < n; i++) { m4.makeTranslation(-220 + i * 1.47, TRILHO_Y + 0.09, TRILHO_Z); dorm.setMatrixAt(i, m4); }
     dorm.receiveShadow = true; scene.add(dorm);
+    // plataforma com cobertura, bancos, lampiões e placa
+    const pz = TRILHO_Z - 2.3, est = new THREE.Group();
+    est.add(caixa(26, 0.55, 2.6, MR.pedra, 0, 0.27, pz)); est.add(caixa(26, 0.06, 0.18, mat(0xe8c95a), 0, 0.57, pz + 1.22));
+    for (const x of [-9, -3, 3, 9]) { est.add(mR(new THREE.CylinderGeometry(0.1, 0.12, 3, 8), MR.preto, x, 2.05, pz - 0.7)); }
+    const teto = caixa(22, 0.18, 2.4, mat(0x3c4048, { roughness: 0.8 }), 0, 3.6, pz - 0.2); teto.rotation.x = -0.12; est.add(teto);
+    est.add(caixa(22.2, 0.22, 2.5, snowMat, 0, 3.78, pz - 0.25)); est.add(caixa(22, 0.2, 0.08, MR.preto, 0, 3.45, pz + 1.0));
+    ledsLinha(est, V3(-11, 3.38, pz + 1.05), V3(11, 3.38, pz + 1.05), 60, ledQuente);
+    for (const x of [-6, 0, 6]) { const b = makeBench(); b.position.set(x, 0.55, pz - 0.6); b.scale.setScalar(0.75); est.add(b); }
+    for (const x of [-12, 12]) { const pj = posteJardim(); pj.position.set(x, 0.55, pz); pj.scale.setScalar(1.3); est.add(pj); }
+    est.add(caixa(6.4, 1.2, 0.2, MR.preto, 0, 2.7, pz - 1.2)); est.add(mR(new THREE.PlaneGeometry(6, 1.0), placaTexto('Estação Vila de Natal', '#1f3d2c', '#ffe7a8'), 0, 2.7, pz - 1.09));
+    // casinha da bilheteria
+    est.add(caixa(4, 3, 3, new THREE.MeshStandardMaterial({ map: rep(brickTex, 2, 1.5), roughness: 0.9 }), 15.5, 2.05, pz - 0.6));
+    const fr = frontaoR({ w: 4, d: 3, h: 1.2, parede: mat(0x8a4a3a), telha: mat(0x3c4048) }); fr.position.set(15.5, 3.55, pz - 0.6); est.add(fr);
+    est.add(caixa(1.2, 0.9, 0.06, LUZ_JANELA, 15.5, 2.2, pz + 0.92));
+    fundir(est); scene.add(est);
   }
-  const trem = makeTrem(); trem.position.set(-200, TRILHO_Y + 0.05, TRILHO_Z); trem.scale.setScalar(1.25); scene.add(trem);
+  const trem = new THREE.Group(); trem.position.set(-200, TRILHO_Y + 0.05, TRILHO_Z); scene.add(trem);
+  let tremModelo = makeTrem(); tremModelo.scale.setScalar(1.25); trem.add(tremModelo);
+  trem.userData.chamine = tremModelo.userData.chamine.clone().multiplyScalar(1.25); trem.userData.comprimento = 22;
+  // trem de verdade (modelos prontos): locomotiva a vapor + 3 vagões de passageiros
+  function montarTremPronto() {
+    const L = PRONTOS.locomotiva, W = PRONTOS.vagao; if (!L || !W || trem.userData.pronto) return;
+    trem.remove(tremModelo); liberar(tremModelo);
+    const g = new THREE.Group(), kL = 7.2 / L.tam.x, kW = 7.4 / W.tam.x;
+    const loco = L.cena.clone(); loco.scale.setScalar(kL); g.add(loco);
+    let x = -L.tam.x * kL / 2 - 0.35;
+    const portas = [];
+    for (let i = 0; i < 3; i++) { const v = W.cena.clone(); v.scale.setScalar(kW); v.position.x = x - W.tam.x * kW / 2; g.add(v); portas.push(v.position.x); x -= W.tam.x * kW + 0.35; }
+    g.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    tremModelo = g; trem.add(g);
+    trem.userData.chamine = L.chamine.clone().multiplyScalar(kL); trem.userData.comprimento = -x; trem.userData.portas = portas; trem.userData.pronto = true;
+  }
   const fumacaTrem = [];
   for (let i = 0; i < 12; i++) { const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: smokeTex, color: 0xdfe6f6, transparent: true, depthWrite: false, opacity: 0 })); s.userData.life = i / 12; scene.add(s); fumacaTrem.push(s); }
 
@@ -2042,6 +2110,16 @@ export async function criarCena(canvas) {
     const o = makePessoa(c, g); o.scale.setScalar(0.85); o.position.set(R(-15, 15), 0, RUA_Z + R(-1.5, 1.5)); scene.add(o);
     return { obj: o, alvo: o.position.clone(), troca: 0, idx: i };
   });
+
+  // passageiros do trem (aparecem na parada)
+  const passageiros = [[0x6b2f8a, 0xf2f2f2], [0xc0392b, 0x2f5d9e], [0x2e7d5b, 0xffc94d], [0x34495e, 0xd8333a], [0xa0522d, 0xf2f2f2]].map(([c, g2]) => { const o = makePessoa(c, g2); o.scale.setScalar(0.8); o.visible = false; scene.add(o); return { obj: o }; });
+  const ouvintesTrem = [];
+  const TREM = { v: 11, estado: 'andando', espera: 0, parou: false };
+  // onde o trem para: na Estação do jogador se ela encosta no trilho, senão na plataforma fixa
+  function paradaDoTrem() {
+    const e = vilaAtual && vilaAtual.predios.find(p => p.tipo === 'estacao' && !p.obra && p.z === MAPA_MIN + 1);
+    return e ? { x: centroLote(e.x, e.z, TIPOS.estacao.tam).x, lado: 1 } : { x: 0, lado: -1 };
+  }
 
   // Papai Noel
   const treno = makeTreno(); treno.visible = false; treno.scale.setScalar(0.85); scene.add(treno);
@@ -2215,7 +2293,7 @@ export async function criarCena(canvas) {
     obj.position.set(c.x, 0, c.z); obj.rotation.y = -(p.r || 0) * Math.PI / 2;
   }
 
-  aoCarregarPronto = () => { for (const e of predios.values()) e.chave = ''; if (vilaAtual) sincronizar(vilaAtual); };
+  aoCarregarPronto = () => { montarTremPronto(); for (const e of predios.values()) e.chave = ''; if (vilaAtual) sincronizar(vilaAtual); };
   function sincronizar(vila) {
     vilaAtual = vila;
     sincTerrenos(vila);
@@ -2508,11 +2586,43 @@ export async function criarCena(canvas) {
 
   function animarVida(dt, t) {
     // trem
-    trem.position.x += dt * 9; if (trem.position.x > 220) trem.position.x = -220;
+    {
+      const par = paradaDoTrem(), comp = trem.userData.comprimento || 22, alvo = par.x + comp / 2 - 3.6; // o meio do trem na frente da plataforma
+      const VMAX = 11, ACEL = 2.4;
+      if (TREM.estado === 'andando') {
+        const dist = alvo - trem.position.x;
+        const vq = !TREM.parou && dist > 0 ? Math.min(VMAX, Math.sqrt(2 * ACEL * dist) + 0.3) : VMAX;
+        TREM.v += Math.max(-ACEL * 2 * dt, Math.min(ACEL * dt, vq - TREM.v));
+        trem.position.x += TREM.v * dt;
+        if (!TREM.parou && dist < 0.15 && dist > -1) {
+          TREM.estado = 'parado'; TREM.espera = 10; TREM.parou = true; TREM.v = 0; TREM.lado = par.lado;
+          ouvintesTrem.forEach(f => f('chegou'));
+          const portas = trem.userData.portas || [-6, -10, -14];
+          passageiros.forEach((pp, i) => { const desce = i < 3; pp.desce = desce; pp.t = -i * 0.6; pp.x0 = trem.position.x + portas[i % portas.length]; pp.obj.visible = false; });
+        }
+        if (trem.position.x > 230) { trem.position.x = -230; TREM.parou = false; }
+      } else {
+        TREM.espera -= dt;
+        if (TREM.espera <= 0) { TREM.estado = 'andando'; ouvintesTrem.forEach(f => f('partiu')); }
+      }
+      // passageiros: descem do trem pra plataforma (e outros sobem), andando
+      for (const pp of passageiros) {
+        if (TREM.estado !== 'parado' && !pp.obj.visible) continue;
+        pp.t = (pp.t || 0) + dt;
+        const k = THREE.MathUtils.clamp(pp.t / 4, 0, 1), lado = TREM.lado || -1;
+        const zTrem = TRILHO_Z + lado * 1.0, zFora = TRILHO_Z + lado * 3.6;
+        if (pp.t < 0 || k >= 1 || TREM.estado !== 'parado') { pp.obj.visible = pp.t >= 0 && k < 1 && TREM.estado === 'parado'; continue; }
+        pp.obj.visible = true;
+        const z = pp.desce ? zTrem + (zFora - zTrem) * k : zFora + (zTrem - zFora) * k;
+        pp.obj.position.set(pp.x0 + Math.sin(pp.t * 3) * 0.05, 0.02 + Math.abs(Math.sin(pp.t * 9)) * 0.05, z);
+        pp.obj.rotation.y = (pp.desce ? lado : -lado) > 0 ? 0 : Math.PI;
+        const pernas = pp.obj.userData.legs; if (pernas) pernas.forEach((l, j) => l.rotation.x = Math.sin(pp.t * 9 + j * Math.PI) * 0.5);
+      }
+    }
     fumacaTrem.forEach(s => {
       const u = s.userData; u.life += dt * 0.35; if (u.life > 1) u.life -= 1;
       const base = trem.localToWorld(trem.userData.chamine.clone());
-      s.position.set(base.x - u.life * 7, base.y + u.life * 5, base.z + Math.sin(u.life * 5) * 0.5);
+      s.position.set(base.x - u.life * 7 * (TREM.v / 11), base.y + u.life * 5, base.z + Math.sin(u.life * 5) * 0.5);
       const sc = 1 + u.life * 4; s.scale.set(sc, sc, 1); s.material.opacity = Math.sin(u.life * Math.PI) * 0.6;
     });
     // carros
@@ -2643,7 +2753,9 @@ export async function criarCena(canvas) {
   return {
     sincronizar, setFantasma, setDeslocamento, centroTerreno, entrarCasa, sairCasa, sincSala, itemEm, posItem, modo: () => modo, setGrade, setSelecionado, esconder, loteEm, predioEm, projetar, topoDe, focar, miniaturas,
     aoQuadro: fn => ouvintes.push(fn),
-    papaiNoel, chamineDe, noelVoando: () => noel.voando,
+    papaiNoel, chamineDe, noelVoando: () => noel.voando, aoTrem: (fn) => ouvintesTrem.push(fn),
+    // (testes) põe o trem parado na estação
+    tremNaEstacao: () => { const par = paradaDoTrem(); trem.position.x = par.x + (trem.userData.comprimento || 22) / 2 - 3.6; TREM.v = 0; TREM.estado = 'andando'; TREM.parou = false; },
     qualidade: () => qualidade, setQualidade: escolherQualidade, neve: () => neve,
     // foto da cena como está agora (pro cartão-postal): desenha e lê no mesmo instante
     foto: (tipo = 'image/jpeg') => { renderer.info.reset(); composer.render(); return renderer.domElement.toDataURL(tipo, 0.92); },

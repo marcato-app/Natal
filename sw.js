@@ -1,7 +1,7 @@
 // Service worker: guarda o jogo no aparelho pra abrir sem internet.
 // Arquivos: responde do cache e atualiza em segundo plano (a versão nova entra na
 // próxima abertura). /api nunca passa pelo cache. Mude VERSAO ao trocar a lista.
-const VERSAO = 'natal-19';
+const VERSAO = 'natal-20';
 const ARQUIVOS = [
   '/', '/index.html', '/manifest.webmanifest',
   '/assets/css/jogo.css', '/assets/js/jogo.js', '/assets/js/cena.js', '/assets/js/regras.js', '/assets/js/audio.js', '/assets/js/anuncios.js',
@@ -13,6 +13,7 @@ const ARQUIVOS = [
   '/assets/vendor/three/addons/libs/meshopt_decoder.module.js',
   '/assets/modelos/casa1a.glb', '/assets/modelos/casa1b.glb', '/assets/modelos/casa1c.glb',
   '/assets/modelos/casa2a.glb', '/assets/modelos/casa2b.glb', '/assets/modelos/casa3.glb',
+  '/assets/modelos/locomotiva.glb', '/assets/modelos/vagao.glb', '/assets/modelos/estacao.glb',
   '/assets/vendor/three/addons/postprocessing/EffectComposer.js',
   '/assets/vendor/three/addons/postprocessing/RenderPass.js',
   '/assets/vendor/three/addons/postprocessing/UnrealBloomPass.js',
